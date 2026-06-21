@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { Room, Schedule } from '@/lib/types'
@@ -8,10 +8,14 @@ import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { CalendarDays, Users, Copy, Sun, Moon, QrCode, RefreshCw } from 'lucide-react'
 import { QRCodeCanvas } from 'qrcode.react'
-import { format, eachDayOfInterval, startOfMonth, endOfMonth, parseISO, isSameMonth } from 'date-fns'
+import { format, eachDayOfInterval, startOfMonth, endOfMonth, parseISO } from 'date-fns'
 import { ko } from 'date-fns/locale'
 
-const MAX_COLOR = '#10b981'
+interface PersonOnDate {
+  name: string
+  start: string
+  end: string
+}
 
 function getHeatColor(count: number, max: number): string {
   if (count === 0) return ''
@@ -22,12 +26,16 @@ function getHeatColor(count: number, max: number): string {
   return 'bg-emerald-100 text-emerald-800'
 }
 
-function buildDateMap(schedules: Schedule[]): Map<string, string[]> {
-  const map = new Map<string, string[]>()
+function buildDateMap(schedules: Schedule[]): Map<string, PersonOnDate[]> {
+  const map = new Map<string, PersonOnDate[]>()
   for (const s of schedules) {
-    for (const d of s.dates) {
-      if (!map.has(d)) map.set(d, [])
-      map.get(d)!.push(s.name)
+    if (s.dates.length === 0) continue
+    const sorted = [...s.dates].sort()
+    const start = sorted[0]
+    const end = sorted[sorted.length - 1]
+    for (const dt of s.dates) {
+      if (!map.has(dt)) map.set(dt, [])
+      map.get(dt)!.push({ name: s.name, start, end })
     }
   }
   return map
@@ -44,6 +52,9 @@ export default function ScheduleAdminPage() {
   const [showQr, setShowQr] = useState(false)
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [hoverDate, setHoverDate] = useState<string | null>(null)
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const participantUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/schedule/${roomId}`
@@ -98,6 +109,7 @@ export default function ScheduleAdminPage() {
     calHeader: d ? 'text-slate-400' : 'text-gray-500',
     navBtn: d ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-gray-100 text-gray-500',
     emptyCell: d ? 'bg-slate-900/30' : 'bg-gray-50',
+    tooltip: d ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-gray-200 text-gray-900',
   }
 
   const copyLink = () => {
@@ -108,13 +120,31 @@ export default function ScheduleAdminPage() {
   const prevMonth = () => setCurrentMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))
   const nextMonth = () => setCurrentMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))
 
-  const selectedNames = selectedDate ? (dateMap.get(selectedDate) ?? []) : []
+  const selectedPeople = selectedDate ? (dateMap.get(selectedDate) ?? []) : []
+  const hoverPeople = hoverDate ? (dateMap.get(hoverDate) ?? []) : []
+
+  const formatRange = (p: PersonOnDate) => {
+    if (p.start === p.end) return format(parseISO(p.start), 'M/d', { locale: ko })
+    return `${format(parseISO(p.start), 'M/d', { locale: ko })} ~ ${format(parseISO(p.end), 'M/d', { locale: ko })}`
+  }
 
   // 가장 겹치는 날짜 Top 5
   const topDates = Array.from(dateMap.entries())
-    .filter(([, names]) => names.length > 0)
+    .filter(([, people]) => people.length > 0)
     .sort((a, b) => b[1].length - a[1].length)
     .slice(0, 5)
+
+  const handleCellEnter = (dateStr: string, e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!dateMap.get(dateStr)?.length) return
+    const containerRect = containerRef.current?.getBoundingClientRect()
+    const cellRect = e.currentTarget.getBoundingClientRect()
+    if (!containerRect) return
+    setHoverDate(dateStr)
+    setHoverPos({
+      x: cellRect.left - containerRect.left + cellRect.width / 2,
+      y: cellRect.top - containerRect.top,
+    })
+  }
 
   if (!room) {
     return (
@@ -167,7 +197,7 @@ export default function ScheduleAdminPage() {
 
         <div className="grid md:grid-cols-2 gap-4">
           {/* 캘린더 히트맵 */}
-          <div className={`rounded-xl border p-4 ${th.card}`}>
+          <div ref={containerRef} className={`relative rounded-xl border p-4 ${th.card}`}>
             <div className="flex items-center justify-between mb-4">
               <h2 className={`font-semibold ${th.text}`}>
                 {format(currentMonth, 'yyyy년 M월', { locale: ko })}
@@ -192,8 +222,8 @@ export default function ScheduleAdminPage() {
               ))}
               {daysInMonth.map((day) => {
                 const dateStr = format(day, 'yyyy-MM-dd')
-                const names = dateMap.get(dateStr) ?? []
-                const count = names.length
+                const people = dateMap.get(dateStr) ?? []
+                const count = people.length
                 const isSelected = selectedDate === dateStr
                 const heatClass = getHeatColor(count, maxCount)
 
@@ -201,6 +231,8 @@ export default function ScheduleAdminPage() {
                   <button
                     key={dateStr}
                     onClick={() => setSelectedDate(isSelected ? null : dateStr)}
+                    onMouseEnter={(e) => handleCellEnter(dateStr, e)}
+                    onMouseLeave={() => setHoverDate(null)}
                     className={`aspect-square rounded-lg flex flex-col items-center justify-center text-xs font-medium transition-all cursor-pointer border-2 ${
                       isSelected
                         ? `${th.selectedDate}`
@@ -215,6 +247,26 @@ export default function ScheduleAdminPage() {
                 )
               })}
             </div>
+
+            {/* 호버 툴팁 */}
+            {hoverDate && hoverPeople.length > 0 && hoverPos && (
+              <div
+                className={`absolute z-10 -translate-x-1/2 -translate-y-full -mt-2 px-3 py-2 rounded-lg border shadow-lg pointer-events-none whitespace-nowrap ${th.tooltip}`}
+                style={{ left: hoverPos.x, top: hoverPos.y }}
+              >
+                <p className="text-xs font-semibold mb-1">
+                  {format(parseISO(hoverDate), 'M/d (eee)', { locale: ko })} · {hoverPeople.length}명
+                </p>
+                <div className="space-y-0.5">
+                  {hoverPeople.map((p, i) => (
+                    <p key={i} className="text-xs">
+                      <span className="font-medium">{p.name}</span>
+                      <span className={`ml-1.5 ${d ? 'text-slate-400' : 'text-gray-500'}`}>({formatRange(p)})</span>
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* 범례 */}
             <div className="flex items-center gap-2 mt-3 justify-end">
@@ -232,14 +284,16 @@ export default function ScheduleAdminPage() {
             {selectedDate && (
               <div className={`rounded-xl border p-4 ${th.card}`}>
                 <h3 className={`font-semibold ${th.text} mb-3`}>
-                  {format(parseISO(selectedDate), 'M월 d일 (eee)', { locale: ko })} — {selectedNames.length}명 휴가
+                  {format(parseISO(selectedDate), 'M월 d일 (eee)', { locale: ko })} — {selectedPeople.length}명 휴가
                 </h3>
-                {selectedNames.length === 0 ? (
+                {selectedPeople.length === 0 ? (
                   <p className={`text-sm ${th.muted}`}>이 날 휴가 예정자가 없어요</p>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
-                    {selectedNames.map((name, i) => (
-                      <span key={i} className={`text-sm px-3 py-1 rounded-full ${th.badge}`}>{name}</span>
+                    {selectedPeople.map((p, i) => (
+                      <span key={i} className={`text-sm px-3 py-1 rounded-full ${th.badge}`}>
+                        {p.name} <span className="opacity-70">({formatRange(p)})</span>
+                      </span>
                     ))}
                   </div>
                 )}
@@ -251,10 +305,12 @@ export default function ScheduleAdminPage() {
               <div className={`rounded-xl border p-4 ${th.card}`}>
                 <h3 className={`font-semibold ${th.text} mb-3`}>🔥 휴가 집중 날짜 TOP 5</h3>
                 <div className="space-y-2">
-                  {topDates.map(([dateStr, names]) => (
+                  {topDates.map(([dateStr, people]) => (
                     <button
                       key={dateStr}
                       onClick={() => setSelectedDate(dateStr === selectedDate ? null : dateStr)}
+                      onMouseEnter={(e) => handleCellEnter(dateStr, e as unknown as React.MouseEvent<HTMLButtonElement>)}
+                      onMouseLeave={() => setHoverDate(null)}
                       className={`w-full flex items-center justify-between p-2 rounded-lg transition-colors ${
                         dateStr === selectedDate ? (d ? 'bg-blue-600/20' : 'bg-blue-50') : (d ? 'hover:bg-slate-700/50' : 'hover:bg-gray-50')
                       }`}
@@ -262,8 +318,8 @@ export default function ScheduleAdminPage() {
                       <span className={`text-sm ${th.text}`}>
                         {format(parseISO(dateStr), 'M/d (eee)', { locale: ko })}
                       </span>
-                      <span className={`text-sm font-semibold ${names.length >= maxCount * 0.75 ? 'text-emerald-400' : th.muted}`}>
-                        {names.length}명
+                      <span className={`text-sm font-semibold ${people.length >= maxCount * 0.75 ? 'text-emerald-400' : th.muted}`}>
+                        {people.length}명
                       </span>
                     </button>
                   ))}
@@ -276,12 +332,18 @@ export default function ScheduleAdminPage() {
               <div className={`rounded-xl border p-4 ${th.card}`}>
                 <h3 className={`font-semibold ${th.text} mb-3`}>참여자 ({schedules.length}명)</h3>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {schedules.map((s) => (
-                    <div key={s.id} className="flex items-center justify-between">
-                      <span className={`text-sm font-medium ${th.text}`}>{s.name}</span>
-                      <span className={`text-xs ${th.muted}`}>{s.dates.length}일</span>
-                    </div>
-                  ))}
+                  {schedules.map((s) => {
+                    const sorted = [...s.dates].sort()
+                    return (
+                      <div key={s.id} className="flex items-center justify-between">
+                        <span className={`text-sm font-medium ${th.text}`}>{s.name}</span>
+                        <span className={`text-xs ${th.muted}`}>
+                          {sorted.length > 0 && `${format(parseISO(sorted[0]), 'M/d')} ~ ${format(parseISO(sorted[sorted.length - 1]), 'M/d')} · `}
+                          {s.dates.length}일
+                        </span>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}
