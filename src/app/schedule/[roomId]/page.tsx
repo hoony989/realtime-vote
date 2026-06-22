@@ -7,7 +7,7 @@ import type { Room, Schedule } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { CalendarDays, Users, Pencil, Copy, UserPlus } from 'lucide-react'
+import { CalendarDays, Users, Copy, Lock, X } from 'lucide-react'
 import { QRCodeCanvas } from 'qrcode.react'
 import { DayPicker, type DateRange, type DayButtonProps } from 'react-day-picker'
 import { ko } from 'date-fns/locale'
@@ -18,23 +18,6 @@ interface PersonOnDate {
   name: string
   start: string
   end: string
-}
-
-const VOTER_ID_KEY = 'realtime_vote_voter_id'
-
-function getVoterId() {
-  let id = localStorage.getItem(VOTER_ID_KEY)
-  if (!id) {
-    id = crypto.randomUUID()
-    localStorage.setItem(VOTER_ID_KEY, id)
-  }
-  return id
-}
-
-function regenerateVoterId() {
-  const id = crypto.randomUUID()
-  localStorage.setItem(VOTER_ID_KEY, id)
-  return id
 }
 
 function buildDateMap(schedules: Schedule[]): Map<string, PersonOnDate[]> {
@@ -65,20 +48,20 @@ export default function SchedulePage() {
   const { roomId } = useParams<{ roomId: string }>()
   const [room, setRoom] = useState<Room | null>(null)
   const [schedules, setSchedules] = useState<Schedule[]>([])
-  const [voterId, setVoterId] = useState('')
-  const [mySchedule, setMySchedule] = useState<Schedule | null>(null)
-  const [editing, setEditing] = useState(false)
+
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [name, setName] = useState('')
+  const [pin, setPin] = useState('')
   const [range, setRange] = useState<DateRange | undefined>(undefined)
   const [loading, setLoading] = useState(false)
+
+  const [pinTarget, setPinTarget] = useState<Schedule | null>(null)
+  const [pinModalInput, setPinModalInput] = useState('')
+  const [verifying, setVerifying] = useState(false)
+
   const [hoverDate, setHoverDate] = useState<string | null>(null)
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const didInitRange = useRef(false)
-
-  useEffect(() => {
-    setVoterId(getVoterId())
-  }, [])
 
   const loadData = useCallback(async () => {
     const { data: roomData } = await supabase.from('rooms').select('*').eq('id', roomId).single()
@@ -86,7 +69,7 @@ export default function SchedulePage() {
 
     const { data: schedData } = await supabase
       .from('schedules')
-      .select('*')
+      .select('id, room_id, voter_id, name, dates, created_at')
       .eq('room_id', roomId)
       .order('created_at')
     if (schedData) setSchedules(schedData)
@@ -106,24 +89,21 @@ export default function SchedulePage() {
     return () => { supabase.removeChannel(channel) }
   }, [roomId, loadData])
 
-  useEffect(() => {
-    if (!voterId) return
-    const mine = schedules.find((s) => s.voter_id === voterId)
-    setMySchedule(mine ?? null)
-    if (mine) {
-      setName((prev) => prev || mine.name)
-      if (!didInitRange.current) {
-        const sorted = [...mine.dates].sort()
-        setRange({ from: parseISO(sorted[0]), to: parseISO(sorted[sorted.length - 1]) })
-        didInitRange.current = true
-      }
-    }
-  }, [schedules, voterId])
+  const resetForm = () => {
+    setEditingId(null)
+    setName('')
+    setPin('')
+    setRange(undefined)
+  }
 
-  const handleRegister = async () => {
+  const handleSubmit = async () => {
     const trimmedName = name.trim()
     if (!trimmedName) {
       toast.error('이름을 입력해주세요.')
+      return
+    }
+    if (!/^\d{4}$/.test(pin)) {
+      toast.error('비밀번호는 숫자 4자리로 입력해주세요.')
       return
     }
     if (!range?.from || !range?.to) {
@@ -131,48 +111,67 @@ export default function SchedulePage() {
       return
     }
 
-    const nameTaken = schedules.some((s) => s.voter_id !== voterId && s.name === trimmedName)
-    if (nameTaken) {
-      toast.error('이미 등록된 이름이에요. 동명이인이라면 이름 뒤에 구분할 표시를 붙여주세요. (예: 김세훈2)')
-      return
-    }
+    const dates = eachDayOfInterval({ start: range.from, end: range.to })
+      .map((d) => format(d, 'yyyy-MM-dd'))
+      .sort()
 
     setLoading(true)
     try {
-      const dates = eachDayOfInterval({ start: range.from, end: range.to })
-        .map((d) => format(d, 'yyyy-MM-dd'))
-        .sort()
-
-      const { error } = await supabase.from('schedules').upsert(
-        { room_id: roomId, voter_id: voterId, name: trimmedName, dates },
-        { onConflict: 'room_id,voter_id' }
-      )
-
-      if (error) {
-        if (error.code === '23505') {
-          toast.error('이미 등록된 이름이에요.')
-          return
-        }
-        throw error
+      const res = await fetch(editingId ? `/api/schedule-entries/${editingId}` : '/api/schedule-entries', {
+        method: editingId ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingId ? { pin, name: trimmedName, dates } : { roomId, name: trimmedName, dates, pin }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error ?? '처리에 실패했어요.')
+        return
       }
 
-      toast.success('일정이 등록됐어요!')
-      setEditing(false)
+      toast.success(editingId ? '수정됐어요!' : '일정이 등록됐어요!')
+      resetForm()
+      loadData()
     } catch {
-      toast.error('등록에 실패했어요.')
+      toast.error('처리에 실패했어요.')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleRegisterAsNewPerson = () => {
-    const newId = regenerateVoterId()
-    setVoterId(newId)
-    setMySchedule(null)
-    setName('')
-    setRange(undefined)
-    didInitRange.current = false
-    setEditing(true)
+  const openPinModal = (schedule: Schedule) => {
+    setPinTarget(schedule)
+    setPinModalInput('')
+  }
+
+  const handleVerifyPin = async () => {
+    if (!pinTarget) return
+    if (!/^\d{4}$/.test(pinModalInput)) {
+      toast.error('비밀번호 4자리를 입력해주세요.')
+      return
+    }
+    setVerifying(true)
+    try {
+      const res = await fetch(`/api/schedule-entries/${pinTarget.id}/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: pinModalInput }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error ?? '비밀번호가 올바르지 않아요.')
+        return
+      }
+
+      const sorted = [...data.schedule.dates].sort()
+      setEditingId(data.schedule.id)
+      setName(data.schedule.name)
+      setPin(pinModalInput)
+      setRange({ from: parseISO(sorted[0]), to: parseISO(sorted[sorted.length - 1]) })
+      setPinTarget(null)
+      toast.success('확인됐어요. 일정을 수정해주세요.')
+    } finally {
+      setVerifying(false)
+    }
   }
 
   const dateMap = buildDateMap(schedules)
@@ -213,17 +212,15 @@ export default function SchedulePage() {
   }
 
   const rangeDays = range?.from && range?.to ? differenceInCalendarDays(range.to, range.from) + 1 : 0
-  const showForm = editing || !mySchedule
 
   function HeatDayButton(props: DayButtonProps) {
     const { day, modifiers, className, children, disabled, ...rest } = props
     const dateStr = format(day.date, 'yyyy-MM-dd')
     const people = dateMap.get(dateStr) ?? []
-    const isPending = modifiers.selected && showForm
     const style: React.CSSProperties = {
       ...getHeatStyle(people.length),
       backgroundImage: 'none',
-      ...(isPending
+      ...(modifiers.selected
         ? { backgroundColor: '#cbd5e1', boxShadow: 'inset 0 0 0 1.5px #64748b', color: '#1e293b' }
         : {}),
     }
@@ -231,11 +228,12 @@ export default function SchedulePage() {
     return (
       <button
         {...rest}
-        disabled={disabled || !showForm}
+        disabled={disabled}
         className={`${className ?? ''} relative`}
         style={style}
         onMouseEnter={(e) => handleCellEnter(dateStr, e)}
         onMouseLeave={() => setHoverDate(null)}
+        onTouchStart={() => {}}
       >
         {children}
         {people.length > 0 && (
@@ -273,10 +271,11 @@ export default function SchedulePage() {
           --rdp-selected-border: none;
           margin: 0;
           font-size: 0.75rem;
+          touch-action: manipulation;
         }
         .rdp-months { flex-wrap: wrap; justify-content: center; }
         .rdp-month_caption { font-size: 0.8rem; font-weight: 600; }
-        .rdp-day_button { transition: filter 0.15s; background-image: none !important; }
+        .rdp-day_button { transition: filter 0.15s; background-image: none !important; touch-action: manipulation; }
         .rdp-day_button:hover:not(:disabled) { filter: brightness(0.95); }
         .rdp-day_button:disabled { opacity: 1; cursor: default; }
         .rdp-button:focus-visible { outline: none; box-shadow: none; }
@@ -314,64 +313,53 @@ export default function SchedulePage() {
           )}
         </div>
 
-        {/* 등록바 */}
+        {/* 등록/수정 폼 */}
         <div className="bg-white rounded-xl border border-slate-300 p-4 mb-5 shadow-sm">
-          {!showForm ? (
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <p className="text-slate-900">
-                <span className="font-semibold">{mySchedule!.name}</span>님의 일정:{' '}
-                <span className="text-slate-600">
-                  {(() => {
-                    const sorted = [...mySchedule!.dates].sort()
-                    return `${format(parseISO(sorted[0]), 'M/d')} ~ ${format(parseISO(sorted[sorted.length - 1]), 'M/d')}`
-                  })()}
-                </span>{' '}
-                <span className="text-slate-400">({mySchedule!.dates.length}일)</span>
-              </p>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setEditing(true)} className="border-slate-300">
-                  <Pencil className="w-3.5 h-3.5 mr-1" /> 수정하기
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleRegisterAsNewPerson} className="border-slate-300">
-                  <UserPlus className="w-3.5 h-3.5 mr-1" /> 다른 사람 등록
-                </Button>
-              </div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold text-slate-900">{editingId ? '내 일정 수정' : '내 일정 등록'}</h2>
+            {editingId && (
+              <button onClick={resetForm} className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1">
+                <X className="w-3.5 h-3.5" /> 취소
+              </button>
+            )}
+          </div>
+          <div className="flex items-stretch gap-2 flex-wrap">
+            <Input
+              placeholder="이름"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-24 flex-shrink-0 bg-white border-slate-300"
+            />
+            <Input
+              placeholder="비밀번호 4자리"
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              inputMode="numeric"
+              type="password"
+              maxLength={4}
+              className="w-32 flex-shrink-0 bg-white border-slate-300 tracking-widest"
+            />
+            <div className="flex-1 min-w-[140px] flex items-center px-3 rounded-md border border-slate-300 bg-slate-50 text-sm">
+              {range?.from && range?.to ? (
+                <span className="text-slate-800">
+                  {format(range.from, 'M/d (eee)', { locale: ko })} ~ {format(range.to, 'M/d (eee)', { locale: ko })}
+                  <span className="text-slate-400 ml-1.5">({rangeDays}일)</span>
+                </span>
+              ) : (
+                <span className="text-slate-400">아래 캘린더에서 기간을 선택해주세요</span>
+              )}
             </div>
-          ) : (
-            <div className="flex items-stretch gap-2 flex-wrap">
-              <Input
-                placeholder="이름"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-24 flex-shrink-0 bg-white border-slate-300"
-                autoFocus
-              />
-              <div className="flex-1 min-w-[140px] flex items-center px-3 rounded-md border border-slate-300 bg-slate-50 text-sm">
-                {range?.from && range?.to ? (
-                  <span className="text-slate-800">
-                    {format(range.from, 'M/d (eee)', { locale: ko })} ~ {format(range.to, 'M/d (eee)', { locale: ko })}
-                    <span className="text-slate-400 ml-1.5">({rangeDays}일)</span>
-                  </span>
-                ) : (
-                  <span className="text-slate-400">아래 캘린더에서 기간을 선택해주세요</span>
-                )}
-              </div>
-              <div className="flex gap-2 w-full sm:w-auto">
-                {mySchedule && (
-                  <Button variant="outline" className="border-slate-300" onClick={() => setEditing(false)}>
-                    취소
-                  </Button>
-                )}
-                <Button
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
-                  onClick={handleRegister}
-                  disabled={loading || !range?.from || !range?.to || !name.trim()}
-                >
-                  {loading ? '등록 중...' : '등록하기'}
-                </Button>
-              </div>
-            </div>
-          )}
+            <Button
+              className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+              onClick={handleSubmit}
+              disabled={loading || !range?.from || !range?.to || !name.trim() || pin.length !== 4}
+            >
+              {loading ? '처리 중...' : editingId ? '수정하기' : '등록하기'}
+            </Button>
+          </div>
+          <p className="text-xs text-slate-400 mt-2">
+            비밀번호는 나중에 내 일정을 수정할 때 필요해요. 잊지 않게 기억해주세요.
+          </p>
         </div>
 
         {/* 통계 카드 */}
@@ -393,21 +381,19 @@ export default function SchedulePage() {
         <div ref={containerRef} className="relative rounded-xl border border-slate-300 bg-white p-4 shadow-sm mb-5">
           <div className="flex items-center justify-between mb-2">
             <h2 className="font-semibold text-slate-900">하계 휴가 일정 (7월 ~ 9월)</h2>
-            {editing && (
-              <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                <span
-                  className="w-2.5 h-2.5 rounded-sm"
-                  style={{ backgroundColor: '#cbd5e1', boxShadow: 'inset 0 0 0 1.5px #64748b' }}
-                />
-                선택 중 (미등록)
-              </div>
-            )}
+            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <span
+                className="w-2.5 h-2.5 rounded-sm"
+                style={{ backgroundColor: '#cbd5e1', boxShadow: 'inset 0 0 0 1.5px #64748b' }}
+              />
+              선택 중 (미등록)
+            </div>
           </div>
           <div className="flex justify-center overflow-x-auto">
             <DayPicker
               mode="range"
               selected={range}
-              onSelect={(r) => { setRange(r); setEditing(true) }}
+              onSelect={setRange}
               locale={ko}
               numberOfMonths={3}
               defaultMonth={SUMMER_START}
@@ -464,18 +450,27 @@ export default function SchedulePage() {
 
           {schedules.length > 0 && (
             <div className="rounded-xl border border-slate-300 bg-white p-4 shadow-sm">
-              <h3 className="font-semibold text-slate-900 mb-3">참여자 ({schedules.length}명)</h3>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
+              <h3 className="font-semibold text-slate-900 mb-3">
+                참여자 ({schedules.length}명) <span className="text-slate-400 font-normal">· 이름을 누르면 수정할 수 있어요</span>
+              </h3>
+              <div className="space-y-1 max-h-48 overflow-y-auto">
                 {schedules.map((s) => {
                   const sorted = [...s.dates].sort()
                   return (
-                    <div key={s.id} className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-slate-900">{s.name}</span>
+                    <button
+                      key={s.id}
+                      onClick={() => openPinModal(s)}
+                      className="w-full flex items-center justify-between hover:bg-slate-50 rounded-lg px-1.5 py-1 -mx-1.5"
+                    >
+                      <span className="text-sm font-medium text-slate-900 flex items-center gap-1">
+                        <Lock className="w-2.5 h-2.5 text-slate-400" />
+                        {s.name}
+                      </span>
                       <span className="text-xs text-slate-500">
                         {sorted.length > 0 && `${format(parseISO(sorted[0]), 'M/d')} ~ ${format(parseISO(sorted[sorted.length - 1]), 'M/d')} · `}
                         {s.dates.length}일
                       </span>
-                    </div>
+                    </button>
                   )
                 })}
               </div>
@@ -483,6 +478,41 @@ export default function SchedulePage() {
           )}
         </div>
       </div>
+
+      {pinTarget && (
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          onClick={() => setPinTarget(null)}
+        >
+          <div className="bg-white rounded-xl p-5 w-full max-w-xs shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-semibold text-slate-900 mb-1">{pinTarget.name}님의 비밀번호</h3>
+            <p className="text-xs text-slate-500 mb-3">등록할 때 입력한 4자리 비밀번호를 입력해주세요.</p>
+            <Input
+              type="password"
+              inputMode="numeric"
+              maxLength={4}
+              placeholder="••••"
+              value={pinModalInput}
+              onChange={(e) => setPinModalInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              onKeyDown={(e) => e.key === 'Enter' && handleVerifyPin()}
+              autoFocus
+              className="mb-3 text-center text-lg tracking-widest"
+            />
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1 border-slate-300" onClick={() => setPinTarget(null)}>
+                취소
+              </Button>
+              <Button
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                onClick={handleVerifyPin}
+                disabled={verifying || pinModalInput.length !== 4}
+              >
+                {verifying ? '확인 중...' : '확인'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -63,6 +63,21 @@ export interface Database {
         }
         Relationships: []
       }
+      schedule_pins: {
+        Row: {
+          schedule_id: string
+          pin_hash: string
+        }
+        Insert: {
+          schedule_id: string
+          pin_hash: string
+        }
+        Update: {
+          schedule_id?: string
+          pin_hash?: string
+        }
+        Relationships: []
+      }
       options: {
         Row: {
           id: string
