@@ -185,18 +185,26 @@ export default function SchedulePage() {
     })
   }
 
+  const rangeDays = range?.from && range?.to ? differenceInCalendarDays(range.to, range.from) + 1 : 0
+  const showForm = editing || !mySchedule
+
   function HeatDayButton(props: DayButtonProps) {
-    const { day, modifiers, className, children, ...rest } = props
+    const { day, modifiers, className, children, disabled, ...rest } = props
     const dateStr = format(day.date, 'yyyy-MM-dd')
     const people = dateMap.get(dateStr) ?? []
+    const isPending = modifiers.selected && showForm
     const style: React.CSSProperties = {
       ...getHeatStyle(people.length, maxCount),
-      ...(modifiers.selected && editing ? { boxShadow: 'inset 0 0 0 2px #64748b' } : {}),
+      backgroundImage: 'none',
+      ...(isPending
+        ? { backgroundColor: '#cbd5e1', boxShadow: 'inset 0 0 0 1.5px #64748b', color: '#1e293b' }
+        : {}),
     }
 
     return (
       <button
         {...rest}
+        disabled={disabled || !showForm}
         className={`${className ?? ''} relative`}
         style={style}
         onMouseEnter={(e) => handleCellEnter(dateStr, e)}
@@ -212,9 +220,6 @@ export default function SchedulePage() {
     )
   }
 
-  const rangeDays = range?.from && range?.to ? differenceInCalendarDays(range.to, range.from) + 1 : 0
-  const showForm = editing || !mySchedule
-
   if (!room) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-200">
@@ -227,18 +232,25 @@ export default function SchedulePage() {
     <div className="min-h-screen bg-slate-200 text-slate-900">
       <style>{`
         .rdp-root {
-          --rdp-accent-color: #3b82f6;
+          --rdp-accent-color: #64748b;
+          --rdp-accent-background-color: #e2e8f0;
           --rdp-day-width: 34px;
           --rdp-day-height: 34px;
           --rdp-day_button-width: 32px;
           --rdp-day_button-height: 32px;
+          --rdp-day_button-border-radius: 8px;
           --rdp-months-gap: 1rem;
+          --rdp-range_middle-background-color: transparent;
+          --rdp-range_start-date-background-color: transparent;
+          --rdp-range_end-date-background-color: transparent;
           margin: 0;
           font-size: 0.75rem;
         }
         .rdp-months { flex-wrap: wrap; justify-content: center; }
         .rdp-month_caption { font-size: 0.8rem; font-weight: 600; }
-        .rdp-day_button:hover:not([disabled]) { filter: brightness(0.95); }
+        .rdp-day_button { transition: filter 0.15s; background-image: none !important; }
+        .rdp-day_button:hover:not(:disabled) { filter: brightness(0.95); }
+        .rdp-day_button:disabled { opacity: 1; cursor: default; }
         .rdp-button:focus-visible { outline: none; box-shadow: none; }
         .rdp-weekday { color: #64748b; font-size: 0.65rem; }
       `}</style>
@@ -259,9 +271,9 @@ export default function SchedulePage() {
             </div>
           </div>
           {participantUrl && (
-            <div className="flex-shrink-0 bg-white rounded-xl border border-slate-300 p-2 shadow-sm text-center">
-              <QRCodeCanvas value={participantUrl} size={72} />
-              <p className="text-[10px] text-slate-400 mt-1">참여 QR</p>
+            <div className="flex-shrink-0 bg-white rounded-xl border border-slate-300 p-3 shadow-sm text-center">
+              <QRCodeCanvas value={participantUrl} size={128} />
+              <p className="text-xs text-slate-400 mt-1.5">참여 QR</p>
             </div>
           )}
         </div>
@@ -342,7 +354,10 @@ export default function SchedulePage() {
             <h2 className="font-semibold text-slate-900">하계 휴가 일정 (7월 ~ 9월)</h2>
             {editing && (
               <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                <span className="w-2.5 h-2.5 rounded-sm" style={{ boxShadow: 'inset 0 0 0 2px #64748b' }} />
+                <span
+                  className="w-2.5 h-2.5 rounded-sm"
+                  style={{ backgroundColor: '#cbd5e1', boxShadow: 'inset 0 0 0 1.5px #64748b' }}
+                />
                 선택 중 (미등록)
               </div>
             )}
