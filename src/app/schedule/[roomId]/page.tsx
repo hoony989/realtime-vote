@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { CalendarDays, Users, Pencil } from 'lucide-react'
+import { QRCodeCanvas } from 'qrcode.react'
 import { DayPicker, type DateRange, type DayButtonProps } from 'react-day-picker'
 import { ko } from 'date-fns/locale'
 import { format, eachDayOfInterval, parseISO, differenceInCalendarDays } from 'date-fns'
@@ -46,11 +47,19 @@ function buildDateMap(schedules: Schedule[]): Map<string, PersonOnDate[]> {
 
 function getHeatStyle(count: number, max: number): React.CSSProperties {
   if (count === 0) return {}
-  const intensity = count / Math.max(max, 1)
-  if (intensity >= 0.75) return { backgroundColor: '#10b981', color: '#fff' }
-  if (intensity >= 0.5) return { backgroundColor: '#34d399', color: '#fff' }
-  if (intensity >= 0.25) return { backgroundColor: '#6ee7b7', color: '#064e3b' }
-  return { backgroundColor: '#d1fae5', color: '#065f46' }
+  const intensity = max > 1 ? (count - 1) / (max - 1) : 0
+  const hue = 142 - intensity * 142 // 142=초록 -> 0=빨강
+  const lightness = 88 - intensity * 38 // 88% -> 50%
+  return {
+    backgroundColor: `hsl(${hue}, 72%, ${lightness}%)`,
+    color: intensity > 0.55 ? '#fff' : '#1f2937',
+  }
+}
+
+function heatColorAt(intensity: number) {
+  const hue = 142 - intensity * 142
+  const lightness = 88 - intensity * 38
+  return `hsl(${hue}, 72%, ${lightness}%)`
 }
 
 const THIS_YEAR = new Date().getFullYear()
@@ -150,6 +159,7 @@ export default function SchedulePage() {
 
   const dateMap = buildDateMap(schedules)
   const maxCount = Math.max(...Array.from(dateMap.values()).map((v) => v.length), 1)
+  const participantUrl = typeof window !== 'undefined' ? window.location.href : ''
 
   const hoverPeople = hoverDate ? (dateMap.get(hoverDate) ?? []) : []
 
@@ -181,7 +191,7 @@ export default function SchedulePage() {
     const people = dateMap.get(dateStr) ?? []
     const style: React.CSSProperties = {
       ...getHeatStyle(people.length, maxCount),
-      ...(modifiers.selected ? { boxShadow: 'inset 0 0 0 2px #2563eb' } : {}),
+      ...(modifiers.selected && editing ? { boxShadow: 'inset 0 0 0 2px #64748b' } : {}),
     }
 
     return (
@@ -235,17 +245,25 @@ export default function SchedulePage() {
 
       <div className="max-w-5xl mx-auto px-4 py-6">
         {/* 헤더 */}
-        <div className="mb-5">
-          <div className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full mb-3 bg-emerald-100 text-emerald-700">
-            <CalendarDays className="w-3.5 h-3.5" />
-            일정 비교
+        <div className="flex items-start justify-between gap-4 mb-5">
+          <div>
+            <div className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full mb-3 bg-emerald-100 text-emerald-700">
+              <CalendarDays className="w-3.5 h-3.5" />
+              일정 비교
+            </div>
+            <h1 className="text-xl font-bold text-slate-900 mb-1">{room.title}</h1>
+            <p className="text-slate-600 text-base leading-relaxed">{room.question}</p>
+            <div className="flex items-center gap-1 mt-2 text-sm text-slate-500">
+              <Users className="w-3.5 h-3.5" />
+              {schedules.length}명 참여 중
+            </div>
           </div>
-          <h1 className="text-xl font-bold text-slate-900 mb-1">{room.title}</h1>
-          <p className="text-slate-600 text-base leading-relaxed">{room.question}</p>
-          <div className="flex items-center gap-1 mt-2 text-sm text-slate-500">
-            <Users className="w-3.5 h-3.5" />
-            {schedules.length}명 참여 중
-          </div>
+          {participantUrl && (
+            <div className="flex-shrink-0 bg-white rounded-xl border border-slate-300 p-2 shadow-sm text-center">
+              <QRCodeCanvas value={participantUrl} size={72} />
+              <p className="text-[10px] text-slate-400 mt-1">참여 QR</p>
+            </div>
+          )}
         </div>
 
         {/* 등록바 */}
@@ -322,10 +340,12 @@ export default function SchedulePage() {
         <div ref={containerRef} className="relative rounded-xl border border-slate-300 bg-white p-4 shadow-sm mb-5">
           <div className="flex items-center justify-between mb-2">
             <h2 className="font-semibold text-slate-900">하계 휴가 일정 (7월 ~ 9월)</h2>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500">
-              <span className="w-2.5 h-2.5 rounded-sm" style={{ boxShadow: 'inset 0 0 0 2px #2563eb' }} />
-              내 선택
-            </div>
+            {editing && (
+              <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                <span className="w-2.5 h-2.5 rounded-sm" style={{ boxShadow: 'inset 0 0 0 2px #64748b' }} />
+                선택 중 (미등록)
+              </div>
+            )}
           </div>
           <div className="flex justify-center overflow-x-auto">
             <DayPicker
@@ -363,9 +383,10 @@ export default function SchedulePage() {
 
           <div className="flex items-center gap-2 mt-3 justify-end">
             <span className="text-xs text-slate-500">적음</span>
-            {['#d1fae5', '#6ee7b7', '#34d399', '#10b981'].map((c) => (
-              <div key={c} className="w-4 h-4 rounded" style={{ backgroundColor: c }} />
-            ))}
+            <div
+              className="w-28 h-3 rounded"
+              style={{ background: `linear-gradient(to right, ${heatColorAt(0)}, ${heatColorAt(0.5)}, ${heatColorAt(1)})` }}
+            />
             <span className="text-xs text-slate-500">많음</span>
           </div>
         </div>
