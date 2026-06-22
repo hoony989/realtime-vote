@@ -106,7 +106,7 @@ export default function Home() {
       if (error) throw error
 
       toast.success('일정 비교방이 생성됐어요!')
-      router.push(`/schedule-admin/${room.id}?token=${room.admin_token}`)
+      router.push(`/schedule/${room.id}`)
     } catch {
       toast.error('생성에 실패했어요.')
     } finally {
