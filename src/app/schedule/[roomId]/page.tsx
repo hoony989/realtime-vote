@@ -7,7 +7,7 @@ import type { Room, Schedule } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { CalendarDays, Users, Pencil } from 'lucide-react'
+import { CalendarDays, Users, Pencil, Copy } from 'lucide-react'
 import { QRCodeCanvas } from 'qrcode.react'
 import { DayPicker, type DateRange, type DayButtonProps } from 'react-day-picker'
 import { ko } from 'date-fns/locale'
@@ -161,6 +161,15 @@ export default function SchedulePage() {
   const maxCount = Math.max(...Array.from(dateMap.values()).map((v) => v.length), 1)
   const participantUrl = typeof window !== 'undefined' ? window.location.href : ''
 
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(participantUrl)
+      toast.success('링크가 복사됐어요!')
+    } catch {
+      toast.error('복사에 실패했어요.')
+    }
+  }
+
   const hoverPeople = hoverDate ? (dateMap.get(hoverDate) ?? []) : []
 
   const formatPersonRange = (p: PersonOnDate) => {
@@ -272,9 +281,17 @@ export default function SchedulePage() {
             </div>
           </div>
           {participantUrl && (
-            <div className="flex-shrink-0 bg-white rounded-xl border border-slate-300 p-3 shadow-sm text-center">
+            <div className="flex-shrink-0 bg-white rounded-xl border border-slate-300 p-3 shadow-sm text-center w-[152px]">
               <QRCodeCanvas value={participantUrl} size={128} />
               <p className="text-xs text-slate-400 mt-1.5">참여 QR</p>
+              <button
+                onClick={copyLink}
+                title={participantUrl}
+                className="flex items-center justify-center gap-1 text-[10px] text-blue-500 hover:text-blue-700 mt-1 w-full"
+              >
+                <Copy className="w-2.5 h-2.5 flex-shrink-0" />
+                <span className="truncate">{participantUrl.replace(/^https?:\/\//, '')}</span>
+              </button>
             </div>
           )}
         </div>
