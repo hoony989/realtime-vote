@@ -52,21 +52,9 @@ function buildDateMap(schedules: Schedule[]): Map<string, PersonOnDate[]> {
   return map
 }
 
-function getHeatStyle(count: number, max: number): React.CSSProperties {
+function getHeatStyle(count: number): React.CSSProperties {
   if (count === 0) return {}
-  const intensity = max > 1 ? (count - 1) / (max - 1) : 0
-  const hue = 142 - intensity * 142 // 142=초록 -> 0=빨강
-  const lightness = 88 - intensity * 38 // 88% -> 50%
-  return {
-    backgroundColor: `hsl(${hue}, 72%, ${lightness}%)`,
-    color: intensity > 0.55 ? '#fff' : '#1f2937',
-  }
-}
-
-function heatColorAt(intensity: number) {
-  const hue = 142 - intensity * 142
-  const lightness = 88 - intensity * 38
-  return `hsl(${hue}, 72%, ${lightness}%)`
+  return { backgroundColor: '#d1fae5', color: '#065f46' }
 }
 
 const THIS_YEAR = new Date().getFullYear()
@@ -133,12 +121,19 @@ export default function SchedulePage() {
   }, [schedules, voterId])
 
   const handleRegister = async () => {
-    if (!name.trim()) {
+    const trimmedName = name.trim()
+    if (!trimmedName) {
       toast.error('이름을 입력해주세요.')
       return
     }
     if (!range?.from || !range?.to) {
       toast.error('캘린더에서 기간을 선택해주세요.')
+      return
+    }
+
+    const nameTaken = schedules.some((s) => s.voter_id !== voterId && s.name === trimmedName)
+    if (nameTaken) {
+      toast.error('이미 등록된 이름이에요. 동명이인이라면 이름 뒤에 구분할 표시를 붙여주세요. (예: 김세훈2)')
       return
     }
 
@@ -149,11 +144,17 @@ export default function SchedulePage() {
         .sort()
 
       const { error } = await supabase.from('schedules').upsert(
-        { room_id: roomId, voter_id: voterId, name: name.trim(), dates },
+        { room_id: roomId, voter_id: voterId, name: trimmedName, dates },
         { onConflict: 'room_id,voter_id' }
       )
 
-      if (error) throw error
+      if (error) {
+        if (error.code === '23505') {
+          toast.error('이미 등록된 이름이에요.')
+          return
+        }
+        throw error
+      }
 
       toast.success('일정이 등록됐어요!')
       setEditing(false)
@@ -220,7 +221,7 @@ export default function SchedulePage() {
     const people = dateMap.get(dateStr) ?? []
     const isPending = modifiers.selected && showForm
     const style: React.CSSProperties = {
-      ...getHeatStyle(people.length, maxCount),
+      ...getHeatStyle(people.length),
       backgroundImage: 'none',
       ...(isPending
         ? { backgroundColor: '#cbd5e1', boxShadow: 'inset 0 0 0 1.5px #64748b', color: '#1e293b' }
@@ -436,13 +437,9 @@ export default function SchedulePage() {
             </div>
           )}
 
-          <div className="flex items-center gap-2 mt-3 justify-end">
-            <span className="text-xs text-slate-500">적음</span>
-            <div
-              className="w-28 h-3 rounded"
-              style={{ background: `linear-gradient(to right, ${heatColorAt(0)}, ${heatColorAt(0.5)}, ${heatColorAt(1)})` }}
-            />
-            <span className="text-xs text-slate-500">많음</span>
+          <div className="flex items-center gap-1.5 mt-3 justify-end text-xs text-slate-500">
+            <span className="w-3 h-3 rounded" style={{ backgroundColor: '#d1fae5' }} />
+            등록자 있음 (숫자 = 인원수)
           </div>
         </div>
 
