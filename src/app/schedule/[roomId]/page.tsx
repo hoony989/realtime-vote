@@ -243,6 +243,7 @@ export default function SchedulePage() {
           --rdp-range_middle-background-color: transparent;
           --rdp-range_start-date-background-color: transparent;
           --rdp-range_end-date-background-color: transparent;
+          --rdp-selected-border: none;
           margin: 0;
           font-size: 0.75rem;
         }
