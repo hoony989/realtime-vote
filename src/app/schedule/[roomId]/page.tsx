@@ -7,7 +7,7 @@ import type { Room, Schedule } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { CalendarDays, Users, Pencil, Copy } from 'lucide-react'
+import { CalendarDays, Users, Pencil, Copy, UserPlus } from 'lucide-react'
 import { QRCodeCanvas } from 'qrcode.react'
 import { DayPicker, type DateRange, type DayButtonProps } from 'react-day-picker'
 import { ko } from 'date-fns/locale'
@@ -20,13 +20,20 @@ interface PersonOnDate {
   end: string
 }
 
+const VOTER_ID_KEY = 'realtime_vote_voter_id'
+
 function getVoterId() {
-  const key = 'realtime_vote_voter_id'
-  let id = localStorage.getItem(key)
+  let id = localStorage.getItem(VOTER_ID_KEY)
   if (!id) {
     id = crypto.randomUUID()
-    localStorage.setItem(key, id)
+    localStorage.setItem(VOTER_ID_KEY, id)
   }
+  return id
+}
+
+function regenerateVoterId() {
+  const id = crypto.randomUUID()
+  localStorage.setItem(VOTER_ID_KEY, id)
   return id
 }
 
@@ -155,6 +162,16 @@ export default function SchedulePage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleRegisterAsNewPerson = () => {
+    const newId = regenerateVoterId()
+    setVoterId(newId)
+    setMySchedule(null)
+    setName('')
+    setRange(undefined)
+    didInitRange.current = false
+    setEditing(true)
   }
 
   const dateMap = buildDateMap(schedules)
@@ -310,9 +327,14 @@ export default function SchedulePage() {
                 </span>{' '}
                 <span className="text-slate-400">({mySchedule!.dates.length}일)</span>
               </p>
-              <Button variant="outline" size="sm" onClick={() => setEditing(true)} className="border-slate-300">
-                <Pencil className="w-3.5 h-3.5 mr-1" /> 수정하기
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setEditing(true)} className="border-slate-300">
+                  <Pencil className="w-3.5 h-3.5 mr-1" /> 수정하기
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleRegisterAsNewPerson} className="border-slate-300">
+                  <UserPlus className="w-3.5 h-3.5 mr-1" /> 다른 사람 등록
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="flex items-stretch gap-2 flex-wrap">
