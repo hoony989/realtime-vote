@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, createContext, useContext } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { Room, Schedule } from '@/lib/types'
@@ -43,6 +43,50 @@ function getHeatStyle(count: number): React.CSSProperties {
 const THIS_YEAR = new Date().getFullYear()
 const SUMMER_START = new Date(THIS_YEAR, 6, 1)
 const SUMMER_END = new Date(THIS_YEAR, 8, 1)
+
+interface CalendarCellContextValue {
+  dateMap: Map<string, PersonOnDate[]>
+  onCellEnter: (dateStr: string, e: React.MouseEvent<HTMLButtonElement>) => void
+  onCellLeave: () => void
+}
+
+const CalendarCellContext = createContext<CalendarCellContextValue | null>(null)
+
+// DayPicker의 components.DayButton으로 전달되는 컴포넌트는 모듈 최상위에 고정된 함수여야 한다.
+// 페이지 컴포넌트 내부에 정의하면 hover로 인한 리렌더마다 함수 참조가 바뀌어 React가 모든
+// 날짜 버튼을 통째로 unmount/remount한다 - Chrome은 이를 너그럽게 처리하지만 Safari/Firefox/
+// 모바일은 mousedown과 mouseup 시점의 엘리먼트가 달라지면 click을 누락시킨다.
+function HeatDayButton(props: DayButtonProps) {
+  const ctx = useContext(CalendarCellContext)
+  const { day, modifiers, className, children, disabled, ...rest } = props
+  const dateStr = format(day.date, 'yyyy-MM-dd')
+  const people = ctx?.dateMap.get(dateStr) ?? []
+  const style: React.CSSProperties = {
+    ...getHeatStyle(people.length),
+    backgroundImage: 'none',
+    ...(modifiers.selected
+      ? { backgroundColor: '#cbd5e1', boxShadow: 'inset 0 0 0 1.5px #64748b', color: '#1e293b' }
+      : {}),
+  }
+
+  return (
+    <button
+      {...rest}
+      disabled={disabled}
+      className={`${className ?? ''} relative`}
+      style={style}
+      onMouseEnter={(e) => ctx?.onCellEnter(dateStr, e)}
+      onMouseLeave={() => ctx?.onCellLeave()}
+    >
+      {children}
+      {people.length > 0 && (
+        <span className="absolute bottom-0 right-0.5 text-[8px] font-bold leading-none">
+          {people.length}
+        </span>
+      )}
+    </button>
+  )
+}
 
 export default function SchedulePage() {
   const { roomId } = useParams<{ roomId: string }>()
@@ -213,38 +257,6 @@ export default function SchedulePage() {
 
   const rangeDays = range?.from && range?.to ? differenceInCalendarDays(range.to, range.from) + 1 : 0
 
-  function HeatDayButton(props: DayButtonProps) {
-    const { day, modifiers, className, children, disabled, ...rest } = props
-    const dateStr = format(day.date, 'yyyy-MM-dd')
-    const people = dateMap.get(dateStr) ?? []
-    const style: React.CSSProperties = {
-      ...getHeatStyle(people.length),
-      backgroundImage: 'none',
-      ...(modifiers.selected
-        ? { backgroundColor: '#cbd5e1', boxShadow: 'inset 0 0 0 1.5px #64748b', color: '#1e293b' }
-        : {}),
-    }
-
-    return (
-      <button
-        {...rest}
-        disabled={disabled}
-        className={`${className ?? ''} relative`}
-        style={style}
-        onMouseEnter={(e) => handleCellEnter(dateStr, e)}
-        onMouseLeave={() => setHoverDate(null)}
-        onTouchStart={() => {}}
-      >
-        {children}
-        {people.length > 0 && (
-          <span className="absolute bottom-0 right-0.5 text-[8px] font-bold leading-none">
-            {people.length}
-          </span>
-        )}
-      </button>
-    )
-  }
-
   if (!room) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-200">
@@ -390,18 +402,22 @@ export default function SchedulePage() {
             </div>
           </div>
           <div className="flex justify-center overflow-x-auto">
-            <DayPicker
-              mode="range"
-              selected={range}
-              onSelect={setRange}
-              locale={ko}
-              numberOfMonths={3}
-              defaultMonth={SUMMER_START}
-              startMonth={SUMMER_START}
-              endMonth={SUMMER_END}
-              disableNavigation
-              components={{ DayButton: HeatDayButton }}
-            />
+            <CalendarCellContext.Provider
+              value={{ dateMap, onCellEnter: handleCellEnter, onCellLeave: () => setHoverDate(null) }}
+            >
+              <DayPicker
+                mode="range"
+                selected={range}
+                onSelect={setRange}
+                locale={ko}
+                numberOfMonths={3}
+                defaultMonth={SUMMER_START}
+                startMonth={SUMMER_START}
+                endMonth={SUMMER_END}
+                disableNavigation
+                components={{ DayButton: HeatDayButton }}
+              />
+            </CalendarCellContext.Provider>
           </div>
 
           {hoverDate && hoverPeople.length > 0 && hoverPos && (
