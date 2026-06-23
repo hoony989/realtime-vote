@@ -41,8 +41,6 @@ function getHeatStyle(count: number): React.CSSProperties {
 }
 
 const THIS_YEAR = new Date().getFullYear()
-const SUMMER_START = new Date(THIS_YEAR, 6, 1)
-const SUMMER_END = new Date(THIS_YEAR, 8, 1)
 
 const FOCUS_DAYS = new Set([
   `${THIS_YEAR}-07-10`,
@@ -52,6 +50,29 @@ const FOCUS_DAYS = new Set([
   `${THIS_YEAR}-09-11`,
   `${THIS_YEAR}-09-25`,
 ])
+
+// 2026년 대한민국 법정공휴일(대체공휴일 포함). 정부 발표 「2026년 월력요항」 기준.
+const HOLIDAYS_2026: Record<string, string> = {
+  '2026-01-01': '신정',
+  '2026-02-16': '설날 연휴',
+  '2026-02-17': '설날',
+  '2026-02-18': '설날 연휴',
+  '2026-03-01': '삼일절',
+  '2026-03-02': '대체공휴일',
+  '2026-05-05': '어린이날',
+  '2026-05-24': '부처님오신날',
+  '2026-05-25': '대체공휴일',
+  '2026-06-06': '현충일',
+  '2026-08-15': '광복절',
+  '2026-08-17': '대체공휴일',
+  '2026-09-24': '추석 연휴',
+  '2026-09-25': '추석',
+  '2026-09-26': '추석 연휴',
+  '2026-10-03': '개천절',
+  '2026-10-05': '대체공휴일',
+  '2026-10-09': '한글날',
+  '2026-12-25': '성탄절',
+}
 
 const SATURDAY_COLOR = '#2563eb'
 const SUNDAY_COLOR = '#dc2626'
@@ -74,9 +95,10 @@ function HeatDayButton(props: DayButtonProps) {
   const dateStr = format(day.date, 'yyyy-MM-dd')
   const people = ctx?.dateMap.get(dateStr) ?? []
   const dow = day.date.getDay()
+  const isHoliday = !!HOLIDAYS_2026[dateStr]
   const style: React.CSSProperties = {
-    ...(dow === 0 ? { color: SUNDAY_COLOR } : {}),
     ...(dow === 6 ? { color: SATURDAY_COLOR } : {}),
+    ...(dow === 0 || isHoliday ? { color: SUNDAY_COLOR } : {}),
     ...getHeatStyle(people.length),
     backgroundImage: 'none',
     ...(modifiers.selected
@@ -259,7 +281,7 @@ export default function SchedulePage() {
     .slice(0, 5)
 
   const handleCellEnter = (dateStr: string, e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!dateMap.get(dateStr)?.length && !FOCUS_DAYS.has(dateStr)) return
+    if (!dateMap.get(dateStr)?.length && !FOCUS_DAYS.has(dateStr) && !HOLIDAYS_2026[dateStr]) return
     const containerRect = containerRef.current?.getBoundingClientRect()
     const cellRect = e.currentTarget.getBoundingClientRect()
     if (!containerRect) return
@@ -302,6 +324,7 @@ export default function SchedulePage() {
         }
         .rdp-months { flex-wrap: wrap; justify-content: center; }
         .rdp-month_caption { font-size: 0.8rem; font-weight: 600; }
+        .rdp-nav { display: none; }
         .rdp-day_button { transition: filter 0.15s; background-image: none !important; touch-action: manipulation; }
         .rdp-day_button:hover:not(:disabled) { filter: brightness(0.95); }
         .rdp-day_button:disabled { opacity: 1; cursor: default; }
@@ -406,10 +429,12 @@ export default function SchedulePage() {
           ))}
         </div>
 
-        {/* 통합 캘린더: 7~9월, 히트맵 + 내 선택 동시 표시 */}
+        {/* 통합 캘린더: 방 생성 시 선택한 월만 표시, 히트맵 + 내 선택 동시 표시 */}
         <div ref={containerRef} className="relative rounded-xl border border-slate-300 bg-white p-4 shadow-sm mb-5">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="font-semibold text-slate-900">하계 휴가 일정 (7월 ~ 9월)</h2>
+            <h2 className="font-semibold text-slate-900">
+              일정 비교 캘린더 ({room.months.map((m) => `${m}월`).join(', ')})
+            </h2>
             <div className="flex items-center gap-1.5 text-xs text-slate-500">
               <span
                 className="w-2.5 h-2.5 rounded-sm"
@@ -418,26 +443,27 @@ export default function SchedulePage() {
               선택 중 (미등록)
             </div>
           </div>
-          <div className="flex justify-center overflow-x-auto">
+          <div className="flex justify-center flex-wrap gap-4 overflow-x-auto">
             <CalendarCellContext.Provider
               value={{ dateMap, onCellEnter: handleCellEnter, onCellLeave: () => setHoverDate(null) }}
             >
-              <DayPicker
-                mode="range"
-                selected={range}
-                onSelect={setRange}
-                locale={ko}
-                numberOfMonths={3}
-                defaultMonth={SUMMER_START}
-                startMonth={SUMMER_START}
-                endMonth={SUMMER_END}
-                disableNavigation
-                components={{ DayButton: HeatDayButton }}
-              />
+              {room.months.map((m) => (
+                <DayPicker
+                  key={m}
+                  mode="range"
+                  selected={range}
+                  onSelect={setRange}
+                  locale={ko}
+                  numberOfMonths={1}
+                  defaultMonth={new Date(THIS_YEAR, m - 1, 1)}
+                  disableNavigation
+                  components={{ DayButton: HeatDayButton }}
+                />
+              ))}
             </CalendarCellContext.Provider>
           </div>
 
-          {hoverDate && hoverPos && (hoverPeople.length > 0 || FOCUS_DAYS.has(hoverDate)) && (
+          {hoverDate && hoverPos && (hoverPeople.length > 0 || FOCUS_DAYS.has(hoverDate) || HOLIDAYS_2026[hoverDate]) && (
             <div
               className="absolute z-10 -translate-x-1/2 -translate-y-full -mt-2 px-3 py-2 rounded-lg border border-slate-200 bg-white shadow-lg pointer-events-none whitespace-nowrap"
               style={{ left: hoverPos.x, top: hoverPos.y }}
@@ -446,6 +472,11 @@ export default function SchedulePage() {
                 {format(parseISO(hoverDate), 'M/d (eee)', { locale: ko })}
                 {hoverPeople.length > 0 && ` · ${hoverPeople.length}명`}
               </p>
+              {HOLIDAYS_2026[hoverDate] && (
+                <p className="text-xs font-medium mb-1" style={{ color: SUNDAY_COLOR }}>
+                  {HOLIDAYS_2026[hoverDate]}
+                </p>
+              )}
               {FOCUS_DAYS.has(hoverDate) && (
                 <p className="text-xs font-medium mb-1 text-slate-600">
                   Focus Day (휴무)
@@ -464,12 +495,12 @@ export default function SchedulePage() {
             </div>
           )}
 
-          <div className="flex items-center gap-3 mt-3 justify-end text-xs text-slate-500">
+          <div className="flex items-center gap-3 mt-3 justify-end flex-wrap text-xs text-slate-500">
             <span className="flex items-center gap-1">
               <span className="w-3 h-3 rounded" style={{ backgroundColor: '#d1fae5' }} /> 등록자 있음(숫자=인원수)
             </span>
             <span className="flex items-center gap-1">
-              <span className="font-semibold" style={{ color: SUNDAY_COLOR }}>일</span> 일요일
+              <span className="font-semibold" style={{ color: SUNDAY_COLOR }}>일</span> 일요일·공휴일
             </span>
             <span className="flex items-center gap-1">
               <span className="font-semibold" style={{ color: SATURDAY_COLOR }}>토</span> 토요일

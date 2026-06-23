@@ -28,6 +28,13 @@ export default function Home() {
   const [schedTitle, setSchedTitle] = useState('')
   const [schedDesc, setSchedDesc] = useState('')
   const [schedLoading, setSchedLoading] = useState(false)
+  const [selectedMonths, setSelectedMonths] = useState<number[]>([7, 8, 9])
+
+  const toggleMonth = (m: number) => {
+    setSelectedMonths((prev) =>
+      prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m].sort((a, b) => a - b)
+    )
+  }
 
   const addOption = () => {
     if (options.length < 10) setOptions([...options, ''])
@@ -88,6 +95,10 @@ export default function Home() {
       toast.error('제목을 입력해주세요.')
       return
     }
+    if (selectedMonths.length === 0) {
+      toast.error('표시할 월을 1개 이상 선택해주세요.')
+      return
+    }
 
     setSchedLoading(true)
     try {
@@ -99,6 +110,7 @@ export default function Home() {
           multi_select: false,
           status: 'open',
           type: 'schedule',
+          months: selectedMonths,
         })
         .select()
         .single()
@@ -244,6 +256,27 @@ export default function Home() {
                   onChange={(e) => setSchedDesc(e.target.value)}
                   rows={2}
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label>표시할 월 선택</Label>
+                <div className="grid grid-cols-6 gap-1.5">
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => toggleMonth(m)}
+                      className={`py-2 rounded-lg text-sm font-medium transition-colors ${
+                        selectedMonths.includes(m)
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                      }`}
+                    >
+                      {m}월
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-500">선택한 월만 캘린더에 표시돼요. 나중에는 바꿀 수 없어요.</p>
               </div>
 
               <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-100">
