@@ -44,6 +44,18 @@ const THIS_YEAR = new Date().getFullYear()
 const SUMMER_START = new Date(THIS_YEAR, 6, 1)
 const SUMMER_END = new Date(THIS_YEAR, 8, 1)
 
+const FOCUS_DAYS = new Set([
+  `${THIS_YEAR}-07-10`,
+  `${THIS_YEAR}-07-24`,
+  `${THIS_YEAR}-08-14`,
+  `${THIS_YEAR}-08-28`,
+  `${THIS_YEAR}-09-11`,
+  `${THIS_YEAR}-09-25`,
+])
+
+const SATURDAY_COLOR = '#2563eb'
+const SUNDAY_COLOR = '#dc2626'
+
 interface CalendarCellContextValue {
   dateMap: Map<string, PersonOnDate[]>
   onCellEnter: (dateStr: string, e: React.MouseEvent<HTMLButtonElement>) => void
@@ -61,7 +73,11 @@ function HeatDayButton(props: DayButtonProps) {
   const { day, modifiers, className, children, disabled, ...rest } = props
   const dateStr = format(day.date, 'yyyy-MM-dd')
   const people = ctx?.dateMap.get(dateStr) ?? []
+  const dow = day.date.getDay()
+  const isFocusDay = FOCUS_DAYS.has(dateStr)
   const style: React.CSSProperties = {
+    ...(dow === 0 ? { color: SUNDAY_COLOR } : {}),
+    ...(dow === 6 || isFocusDay ? { color: SATURDAY_COLOR } : {}),
     ...getHeatStyle(people.length),
     backgroundImage: 'none',
     ...(modifiers.selected
@@ -244,7 +260,7 @@ export default function SchedulePage() {
     .slice(0, 5)
 
   const handleCellEnter = (dateStr: string, e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!dateMap.get(dateStr)?.length) return
+    if (!dateMap.get(dateStr)?.length && !FOCUS_DAYS.has(dateStr)) return
     const containerRect = containerRef.current?.getBoundingClientRect()
     const cellRect = e.currentTarget.getBoundingClientRect()
     if (!containerRect) return
@@ -291,6 +307,8 @@ export default function SchedulePage() {
         .rdp-day_button:hover:not(:disabled) { filter: brightness(0.95); }
         .rdp-day_button:disabled { opacity: 1; cursor: default; }
         .rdp-button:focus-visible { outline: none; box-shadow: none; }
+        .rdp-weekdays .rdp-weekday:first-child { color: ${SUNDAY_COLOR}; }
+        .rdp-weekdays .rdp-weekday:last-child { color: ${SATURDAY_COLOR}; }
         .rdp-weekday { color: #64748b; font-size: 0.65rem; }
       `}</style>
 
@@ -420,28 +438,43 @@ export default function SchedulePage() {
             </CalendarCellContext.Provider>
           </div>
 
-          {hoverDate && hoverPeople.length > 0 && hoverPos && (
+          {hoverDate && hoverPos && (hoverPeople.length > 0 || FOCUS_DAYS.has(hoverDate)) && (
             <div
               className="absolute z-10 -translate-x-1/2 -translate-y-full -mt-2 px-3 py-2 rounded-lg border border-slate-200 bg-white shadow-lg pointer-events-none whitespace-nowrap"
               style={{ left: hoverPos.x, top: hoverPos.y }}
             >
               <p className="text-xs font-semibold mb-1 text-slate-900">
-                {format(parseISO(hoverDate), 'M/d (eee)', { locale: ko })} · {hoverPeople.length}명
+                {format(parseISO(hoverDate), 'M/d (eee)', { locale: ko })}
+                {hoverPeople.length > 0 && ` · ${hoverPeople.length}명`}
               </p>
-              <div className="space-y-0.5">
-                {hoverPeople.map((p, i) => (
-                  <p key={i} className="text-xs">
-                    <span className="font-medium text-slate-800">{p.name}</span>
-                    <span className="ml-1.5 text-slate-500">({formatPersonRange(p)})</span>
-                  </p>
-                ))}
-              </div>
+              {FOCUS_DAYS.has(hoverDate) && (
+                <p className="text-xs font-medium mb-1" style={{ color: SATURDAY_COLOR }}>
+                  포커스데이 (휴무)
+                </p>
+              )}
+              {hoverPeople.length > 0 && (
+                <div className="space-y-0.5">
+                  {hoverPeople.map((p, i) => (
+                    <p key={i} className="text-xs">
+                      <span className="font-medium text-slate-800">{p.name}</span>
+                      <span className="ml-1.5 text-slate-500">({formatPersonRange(p)})</span>
+                    </p>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
-          <div className="flex items-center gap-1.5 mt-3 justify-end text-xs text-slate-500">
-            <span className="w-3 h-3 rounded" style={{ backgroundColor: '#d1fae5' }} />
-            등록자 있음 (숫자 = 인원수)
+          <div className="flex items-center gap-3 mt-3 justify-end text-xs text-slate-500">
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded" style={{ backgroundColor: '#d1fae5' }} /> 등록자 있음(숫자=인원수)
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="font-semibold" style={{ color: SUNDAY_COLOR }}>일</span> 일요일
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="font-semibold" style={{ color: SATURDAY_COLOR }}>토</span> 토요일·포커스데이
+            </span>
           </div>
         </div>
 
