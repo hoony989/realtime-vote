@@ -12,7 +12,7 @@ export interface Database {
           admin_token: string
           multi_select: boolean
           type: string
-          months: number[]
+          months: string[]
           created_at: string
         }
         Insert: {
@@ -23,7 +23,7 @@ export interface Database {
           admin_token?: string
           multi_select?: boolean
           type?: string
-          months?: number[]
+          months?: string[]
           created_at?: string
         }
         Update: {
@@ -34,7 +34,7 @@ export interface Database {
           admin_token?: string
           multi_select?: boolean
           type?: string
-          months?: number[]
+          months?: string[]
           created_at?: string
         }
         Relationships: []

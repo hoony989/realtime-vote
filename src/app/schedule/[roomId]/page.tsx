@@ -51,8 +51,9 @@ const FOCUS_DAYS = new Set([
   `${THIS_YEAR}-09-25`,
 ])
 
-// 2026년 대한민국 법정공휴일(대체공휴일 포함). 정부 발표 「2026년 월력요항」 기준.
-const HOLIDAYS_2026: Record<string, string> = {
+// 대한민국 법정공휴일(대체공휴일 포함). 정부 발표 「월력요항」 기준.
+// 방 생성 시 연도를 넘기는 기간(예: 2026년 12월 ~ 2027년 3월)을 고를 수 있어 두 해를 모두 채워둔다.
+const HOLIDAYS: Record<string, string> = {
   '2026-01-01': '신정',
   '2026-02-16': '설날 연휴',
   '2026-02-17': '설날',
@@ -72,6 +73,12 @@ const HOLIDAYS_2026: Record<string, string> = {
   '2026-10-05': '대체공휴일',
   '2026-10-09': '한글날',
   '2026-12-25': '성탄절',
+  '2027-01-01': '신정',
+  '2027-02-06': '설날 연휴',
+  '2027-02-07': '설날',
+  '2027-02-08': '설날 연휴',
+  '2027-02-09': '대체공휴일',
+  '2027-03-01': '삼일절',
 }
 
 const SATURDAY_COLOR = '#2563eb'
@@ -95,7 +102,7 @@ function HeatDayButton(props: DayButtonProps) {
   const dateStr = format(day.date, 'yyyy-MM-dd')
   const people = ctx?.dateMap.get(dateStr) ?? []
   const dow = day.date.getDay()
-  const isHoliday = !!HOLIDAYS_2026[dateStr]
+  const isHoliday = !!HOLIDAYS[dateStr]
   const style: React.CSSProperties = {
     ...(dow === 6 ? { color: SATURDAY_COLOR } : {}),
     ...(dow === 0 || isHoliday ? { color: SUNDAY_COLOR } : {}),
@@ -281,7 +288,7 @@ export default function SchedulePage() {
     .slice(0, 5)
 
   const handleCellEnter = (dateStr: string, e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!dateMap.get(dateStr)?.length && !FOCUS_DAYS.has(dateStr) && !HOLIDAYS_2026[dateStr]) return
+    if (!dateMap.get(dateStr)?.length && !FOCUS_DAYS.has(dateStr) && !HOLIDAYS[dateStr]) return
     const containerRect = containerRef.current?.getBoundingClientRect()
     const cellRect = e.currentTarget.getBoundingClientRect()
     if (!containerRect) return
@@ -301,6 +308,16 @@ export default function SchedulePage() {
       </div>
     )
   }
+
+  const formatYearMonth = (ym: string) => {
+    const [y, m] = ym.split('-').map(Number)
+    return `${y}년 ${m}월`
+  }
+  const monthsLabel = room.months.length === 0
+    ? ''
+    : room.months[0] === room.months[room.months.length - 1]
+      ? formatYearMonth(room.months[0])
+      : `${formatYearMonth(room.months[0])} ~ ${formatYearMonth(room.months[room.months.length - 1])}`
 
   return (
     <div className="min-h-screen bg-slate-200 text-slate-900">
@@ -429,12 +446,10 @@ export default function SchedulePage() {
           ))}
         </div>
 
-        {/* 통합 캘린더: 방 생성 시 선택한 월만 표시, 히트맵 + 내 선택 동시 표시 */}
+        {/* 통합 캘린더: 방 생성 시 선택한 기간(연-월)만 표시, 히트맵 + 내 선택 동시 표시 */}
         <div ref={containerRef} className="relative rounded-xl border border-slate-300 bg-white p-4 shadow-sm mb-5">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="font-semibold text-slate-900">
-              일정 비교 캘린더 ({room.months.map((m) => `${m}월`).join(', ')})
-            </h2>
+            <h2 className="font-semibold text-slate-900">일정 비교 캘린더 ({monthsLabel})</h2>
             <div className="flex items-center gap-1.5 text-xs text-slate-500">
               <span
                 className="w-2.5 h-2.5 rounded-sm"
@@ -447,23 +462,26 @@ export default function SchedulePage() {
             <CalendarCellContext.Provider
               value={{ dateMap, onCellEnter: handleCellEnter, onCellLeave: () => setHoverDate(null) }}
             >
-              {room.months.map((m) => (
-                <DayPicker
-                  key={m}
-                  mode="range"
-                  selected={range}
-                  onSelect={setRange}
-                  locale={ko}
-                  numberOfMonths={1}
-                  defaultMonth={new Date(THIS_YEAR, m - 1, 1)}
-                  disableNavigation
-                  components={{ DayButton: HeatDayButton }}
-                />
-              ))}
+              {room.months.map((ym) => {
+                const [y, m] = ym.split('-').map(Number)
+                return (
+                  <DayPicker
+                    key={ym}
+                    mode="range"
+                    selected={range}
+                    onSelect={setRange}
+                    locale={ko}
+                    numberOfMonths={1}
+                    defaultMonth={new Date(y, m - 1, 1)}
+                    disableNavigation
+                    components={{ DayButton: HeatDayButton }}
+                  />
+                )
+              })}
             </CalendarCellContext.Provider>
           </div>
 
-          {hoverDate && hoverPos && (hoverPeople.length > 0 || FOCUS_DAYS.has(hoverDate) || HOLIDAYS_2026[hoverDate]) && (
+          {hoverDate && hoverPos && (hoverPeople.length > 0 || FOCUS_DAYS.has(hoverDate) || HOLIDAYS[hoverDate]) && (
             <div
               className="absolute z-10 -translate-x-1/2 -translate-y-full -mt-2 px-3 py-2 rounded-lg border border-slate-200 bg-white shadow-lg pointer-events-none whitespace-nowrap"
               style={{ left: hoverPos.x, top: hoverPos.y }}
@@ -472,9 +490,9 @@ export default function SchedulePage() {
                 {format(parseISO(hoverDate), 'M/d (eee)', { locale: ko })}
                 {hoverPeople.length > 0 && ` · ${hoverPeople.length}명`}
               </p>
-              {HOLIDAYS_2026[hoverDate] && (
+              {HOLIDAYS[hoverDate] && (
                 <p className="text-xs font-medium mb-1" style={{ color: SUNDAY_COLOR }}>
-                  {HOLIDAYS_2026[hoverDate]}
+                  {HOLIDAYS[hoverDate]}
                 </p>
               )}
               {FOCUS_DAYS.has(hoverDate) && (

@@ -13,6 +13,27 @@ import { Plus, Trash2, Vote, CalendarDays } from 'lucide-react'
 
 type Tab = 'vote' | 'schedule'
 
+const CURRENT_YEAR = new Date().getFullYear()
+const YEAR_OPTIONS = [CURRENT_YEAR, CURRENT_YEAR + 1]
+const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1)
+
+function expandMonthRange(startYear: number, startMonth: number, endYear: number, endMonth: number): string[] {
+  const result: string[] = []
+  let y = startYear
+  let m = startMonth
+  let guard = 0
+  while ((y < endYear || (y === endYear && m <= endMonth)) && guard < 24) {
+    result.push(`${y}-${String(m).padStart(2, '0')}`)
+    m += 1
+    if (m > 12) {
+      m = 1
+      y += 1
+    }
+    guard += 1
+  }
+  return result
+}
+
 export default function Home() {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('vote')
@@ -28,13 +49,10 @@ export default function Home() {
   const [schedTitle, setSchedTitle] = useState('')
   const [schedDesc, setSchedDesc] = useState('')
   const [schedLoading, setSchedLoading] = useState(false)
-  const [selectedMonths, setSelectedMonths] = useState<number[]>([7, 8, 9])
-
-  const toggleMonth = (m: number) => {
-    setSelectedMonths((prev) =>
-      prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m].sort((a, b) => a - b)
-    )
-  }
+  const [startYear, setStartYear] = useState(CURRENT_YEAR)
+  const [startMonth, setStartMonth] = useState(7)
+  const [endYear, setEndYear] = useState(CURRENT_YEAR)
+  const [endMonth, setEndMonth] = useState(9)
 
   const addOption = () => {
     if (options.length < 10) setOptions([...options, ''])
@@ -95,8 +113,14 @@ export default function Home() {
       toast.error('제목을 입력해주세요.')
       return
     }
-    if (selectedMonths.length === 0) {
-      toast.error('표시할 월을 1개 이상 선택해주세요.')
+
+    const months = expandMonthRange(startYear, startMonth, endYear, endMonth)
+    if (months.length === 0) {
+      toast.error('종료월이 시작월보다 빠를 수 없어요.')
+      return
+    }
+    if (months.length > 12) {
+      toast.error('한 번에 최대 12개월까지 선택할 수 있어요.')
       return
     }
 
@@ -110,7 +134,7 @@ export default function Home() {
           multi_select: false,
           status: 'open',
           type: 'schedule',
-          months: selectedMonths,
+          months,
         })
         .select()
         .single()
@@ -259,24 +283,55 @@ export default function Home() {
               </div>
 
               <div className="space-y-2">
-                <Label>표시할 월 선택</Label>
-                <div className="grid grid-cols-6 gap-1.5">
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => toggleMonth(m)}
-                      className={`py-2 rounded-lg text-sm font-medium transition-colors ${
-                        selectedMonths.includes(m)
-                          ? 'bg-emerald-600 text-white'
-                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                      }`}
+                <Label>표시할 기간 선택</Label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-slate-500 w-7">시작</span>
+                    <select
+                      value={startYear}
+                      onChange={(e) => setStartYear(Number(e.target.value))}
+                      className="h-9 px-2 rounded-md border border-slate-300 bg-white text-sm"
                     >
-                      {m}월
-                    </button>
-                  ))}
+                      {YEAR_OPTIONS.map((y) => (
+                        <option key={y} value={y}>{y}년</option>
+                      ))}
+                    </select>
+                    <select
+                      value={startMonth}
+                      onChange={(e) => setStartMonth(Number(e.target.value))}
+                      className="h-9 px-2 rounded-md border border-slate-300 bg-white text-sm"
+                    >
+                      {MONTH_OPTIONS.map((m) => (
+                        <option key={m} value={m}>{m}월</option>
+                      ))}
+                    </select>
+                  </div>
+                  <span className="text-slate-400">~</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-slate-500 w-7">종료</span>
+                    <select
+                      value={endYear}
+                      onChange={(e) => setEndYear(Number(e.target.value))}
+                      className="h-9 px-2 rounded-md border border-slate-300 bg-white text-sm"
+                    >
+                      {YEAR_OPTIONS.map((y) => (
+                        <option key={y} value={y}>{y}년</option>
+                      ))}
+                    </select>
+                    <select
+                      value={endMonth}
+                      onChange={(e) => setEndMonth(Number(e.target.value))}
+                      className="h-9 px-2 rounded-md border border-slate-300 bg-white text-sm"
+                    >
+                      {MONTH_OPTIONS.map((m) => (
+                        <option key={m} value={m}>{m}월</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                <p className="text-xs text-slate-500">선택한 월만 캘린더에 표시돼요. 나중에는 바꿀 수 없어요.</p>
+                <p className="text-xs text-slate-500">
+                  연도가 달라도 괜찮아요 (예: 2026년 12월 ~ 2027년 3월). 최대 12개월까지 선택할 수 있고, 나중에는 바꿀 수 없어요.
+                </p>
               </div>
 
               <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-100">
