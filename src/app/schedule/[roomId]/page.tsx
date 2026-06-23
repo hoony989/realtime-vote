@@ -74,10 +74,9 @@ function HeatDayButton(props: DayButtonProps) {
   const dateStr = format(day.date, 'yyyy-MM-dd')
   const people = ctx?.dateMap.get(dateStr) ?? []
   const dow = day.date.getDay()
-  const isFocusDay = FOCUS_DAYS.has(dateStr)
   const style: React.CSSProperties = {
     ...(dow === 0 ? { color: SUNDAY_COLOR } : {}),
-    ...(dow === 6 || isFocusDay ? { color: SATURDAY_COLOR } : {}),
+    ...(dow === 6 ? { color: SATURDAY_COLOR } : {}),
     ...getHeatStyle(people.length),
     backgroundImage: 'none',
     ...(modifiers.selected
@@ -448,8 +447,8 @@ export default function SchedulePage() {
                 {hoverPeople.length > 0 && ` · ${hoverPeople.length}명`}
               </p>
               {FOCUS_DAYS.has(hoverDate) && (
-                <p className="text-xs font-medium mb-1" style={{ color: SATURDAY_COLOR }}>
-                  포커스데이 (휴무)
+                <p className="text-xs font-medium mb-1 text-slate-600">
+                  Focus Day (휴무)
                 </p>
               )}
               {hoverPeople.length > 0 && (
@@ -473,8 +472,9 @@ export default function SchedulePage() {
               <span className="font-semibold" style={{ color: SUNDAY_COLOR }}>일</span> 일요일
             </span>
             <span className="flex items-center gap-1">
-              <span className="font-semibold" style={{ color: SATURDAY_COLOR }}>토</span> 토요일·포커스데이
+              <span className="font-semibold" style={{ color: SATURDAY_COLOR }}>토</span> 토요일
             </span>
+            <span className="flex items-center gap-1">Focus Day는 마우스를 올리면 표시돼요</span>
           </div>
         </div>
 
