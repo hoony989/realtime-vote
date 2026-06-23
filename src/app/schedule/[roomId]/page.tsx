@@ -7,7 +7,7 @@ import type { Room, Schedule } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { CalendarDays, Users, Copy, Lock, X } from 'lucide-react'
+import { CalendarDays, Users, Copy, Lock, X, Trash2 } from 'lucide-react'
 import { QRCodeCanvas } from 'qrcode.react'
 import { DayPicker, type DateRange, type DayButtonProps } from 'react-day-picker'
 import { ko } from 'date-fns/locale'
@@ -37,7 +37,9 @@ function buildDateMap(schedules: Schedule[]): Map<string, PersonOnDate[]> {
 
 function getHeatStyle(count: number): React.CSSProperties {
   if (count === 0) return {}
-  return { backgroundColor: '#d1fae5', color: '#065f46' }
+  if (count === 1) return { backgroundColor: '#d1fae5', color: '#065f46' }
+  if (count === 2) return { backgroundColor: '#6ee7b7', color: '#064e3b' }
+  return { backgroundColor: '#059669', color: '#ffffff' }
 }
 
 const THIS_YEAR = new Date().getFullYear()
@@ -145,6 +147,7 @@ export default function SchedulePage() {
 
   const [pinTarget, setPinTarget] = useState<Schedule | null>(null)
   const [pinModalInput, setPinModalInput] = useState('')
+  const [pinAction, setPinAction] = useState<'edit' | 'delete'>('edit')
   const [verifying, setVerifying] = useState(false)
 
   const [hoverDate, setHoverDate] = useState<string | null>(null)
@@ -229,6 +232,13 @@ export default function SchedulePage() {
   const openPinModal = (schedule: Schedule) => {
     setPinTarget(schedule)
     setPinModalInput('')
+    setPinAction('edit')
+  }
+
+  const openDeletePinModal = (schedule: Schedule) => {
+    setPinTarget(schedule)
+    setPinModalInput('')
+    setPinAction('delete')
   }
 
   const handleVerifyPin = async () => {
@@ -239,24 +249,40 @@ export default function SchedulePage() {
     }
     setVerifying(true)
     try {
-      const res = await fetch(`/api/schedule-entries/${pinTarget.id}/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: pinModalInput }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        toast.error(data.error ?? '비밀번호가 올바르지 않아요.')
-        return
-      }
+      if (pinAction === 'delete') {
+        const res = await fetch(`/api/schedule-entries/${pinTarget.id}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin: pinModalInput }),
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          toast.error(data.error ?? '비밀번호가 올바르지 않아요.')
+          return
+        }
+        toast.success('일정이 삭제됐어요.')
+        setPinTarget(null)
+        loadData()
+      } else {
+        const res = await fetch(`/api/schedule-entries/${pinTarget.id}/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin: pinModalInput }),
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          toast.error(data.error ?? '비밀번호가 올바르지 않아요.')
+          return
+        }
 
-      const sorted = [...data.schedule.dates].sort()
-      setEditingId(data.schedule.id)
-      setName(data.schedule.name)
-      setPin(pinModalInput)
-      setRange({ from: parseISO(sorted[0]), to: parseISO(sorted[sorted.length - 1]) })
-      setPinTarget(null)
-      toast.success('확인됐어요. 일정을 수정해주세요.')
+        const sorted = [...data.schedule.dates].sort()
+        setEditingId(data.schedule.id)
+        setName(data.schedule.name)
+        setPin(pinModalInput)
+        setRange({ from: parseISO(sorted[0]), to: parseISO(sorted[sorted.length - 1]) })
+        setPinTarget(null)
+        toast.success('확인됐어요. 일정을 수정해주세요.')
+      }
     } finally {
       setVerifying(false)
     }
@@ -515,7 +541,13 @@ export default function SchedulePage() {
 
           <div className="flex items-center gap-3 mt-3 justify-end flex-wrap text-xs text-slate-500">
             <span className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded" style={{ backgroundColor: '#d1fae5' }} /> 등록자 있음(숫자=인원수)
+              <span className="w-3 h-3 rounded" style={{ backgroundColor: '#d1fae5' }} /> 1명
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded" style={{ backgroundColor: '#6ee7b7' }} /> 2명
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded" style={{ backgroundColor: '#059669' }} /> 3명+
             </span>
             <span className="flex items-center gap-1">
               <span className="font-semibold" style={{ color: SUNDAY_COLOR }}>일</span> 일요일·공휴일
@@ -555,20 +587,28 @@ export default function SchedulePage() {
                 {schedules.map((s) => {
                   const sorted = [...s.dates].sort()
                   return (
-                    <button
-                      key={s.id}
-                      onClick={() => openPinModal(s)}
-                      className="w-full flex items-center justify-between hover:bg-slate-50 rounded-lg px-1.5 py-1 -mx-1.5"
-                    >
-                      <span className="text-sm font-medium text-slate-900 flex items-center gap-1">
-                        <Lock className="w-2.5 h-2.5 text-slate-400" />
-                        {s.name}
-                      </span>
-                      <span className="text-xs text-slate-500">
-                        {sorted.length > 0 && `${format(parseISO(sorted[0]), 'M/d')} ~ ${format(parseISO(sorted[sorted.length - 1]), 'M/d')} · `}
-                        {s.dates.length}일
-                      </span>
-                    </button>
+                    <div key={s.id} className="flex items-center hover:bg-slate-50 rounded-lg px-1.5 py-1 -mx-1.5 group">
+                      <button
+                        onClick={() => openPinModal(s)}
+                        className="flex-1 flex items-center justify-between"
+                      >
+                        <span className="text-sm font-medium text-slate-900 flex items-center gap-1">
+                          <Lock className="w-2.5 h-2.5 text-slate-400" />
+                          {s.name}
+                        </span>
+                        <span className="text-xs text-slate-500 mr-2">
+                          {sorted.length > 0 && `${format(parseISO(sorted[0]), 'M/d')} ~ ${format(parseISO(sorted[sorted.length - 1]), 'M/d')} · `}
+                          {s.dates.length}일
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => openDeletePinModal(s)}
+                        className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-opacity flex-shrink-0"
+                        title="삭제"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   )
                 })}
               </div>
@@ -583,8 +623,14 @@ export default function SchedulePage() {
           onClick={() => setPinTarget(null)}
         >
           <div className="bg-white rounded-xl p-5 w-full max-w-xs shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-semibold text-slate-900 mb-1">{pinTarget.name}님의 비밀번호</h3>
-            <p className="text-xs text-slate-500 mb-3">등록할 때 입력한 4자리 비밀번호를 입력해주세요.</p>
+            <h3 className="font-semibold text-slate-900 mb-1">
+              {pinAction === 'delete' ? `${pinTarget.name}님 일정 삭제` : `${pinTarget.name}님의 비밀번호`}
+            </h3>
+            <p className="text-xs text-slate-500 mb-3">
+              {pinAction === 'delete'
+                ? '등록할 때 입력한 비밀번호를 확인하면 일정이 삭제돼요.'
+                : '등록할 때 입력한 4자리 비밀번호를 입력해주세요.'}
+            </p>
             <Input
               type="password"
               inputMode="numeric"
@@ -601,11 +647,11 @@ export default function SchedulePage() {
                 취소
               </Button>
               <Button
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                className={`flex-1 ${pinAction === 'delete' ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-600 hover:bg-emerald-700'}`}
                 onClick={handleVerifyPin}
                 disabled={verifying || pinModalInput.length !== 4}
               >
-                {verifying ? '확인 중...' : '확인'}
+                {verifying ? '처리 중...' : pinAction === 'delete' ? '삭제하기' : '확인'}
               </Button>
             </div>
           </div>
