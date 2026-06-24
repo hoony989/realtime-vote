@@ -7,13 +7,23 @@ const mono = JetBrains_Mono({ subsets: ['latin'], weight: '500' })
 
 const ACCENT = '#BF3A2C'
 
-const entries = [
+type Entry = {
+  no: string
+  title: string
+  desc: string
+  tag: string
+  href: string
+  soon: boolean
+}
+
+const entries: Entry[] = [
   {
     no: '01',
     title: '라이브 투표',
     desc: '질문을 올리고 QR로 모아 실시간 결과를 확인해요',
     tag: 'LIVE',
     href: '/vote',
+    soon: false,
   },
   {
     no: '02',
@@ -21,15 +31,17 @@ const entries = [
     desc: '휴가와 일정을 모아 겹치는 날을 한눈에 확인해요',
     tag: 'SCHEDULE',
     href: '/schedule',
+    soon: false,
   },
   {
     no: '03',
     title: '다음 도구',
     desc: '곧 새로운 도구가 추가될 예정이에요',
     tag: 'SOON',
+    href: '',
     soon: true,
   },
-] as const
+]
 
 export default function Home() {
   return (
