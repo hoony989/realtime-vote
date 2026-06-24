@@ -43,7 +43,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const body = await req.json()
-  const { pin, name, dates } = body
+  const { pin, name, dates, is_undecided } = body
 
   if (!isValidPin(pin)) {
     return NextResponse.json({ error: '비밀번호는 숫자 4자리로 입력해주세요.' }, { status: 400 })
@@ -52,7 +52,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (!trimmedName) {
     return NextResponse.json({ error: '이름을 입력해주세요.' }, { status: 400 })
   }
-  if (!Array.isArray(dates) || dates.length === 0 || !dates.every((d) => typeof d === 'string')) {
+  const isUndecided = !!is_undecided
+  if (!isUndecided && (!Array.isArray(dates) || dates.length === 0 || !dates.every((d) => typeof d === 'string'))) {
     return NextResponse.json({ error: '날짜를 선택해주세요.' }, { status: 400 })
   }
 
@@ -92,7 +93,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
   const { data: updated, error: updateError } = await supabaseAdmin
     .from('schedules')
-    .update({ name: trimmedName, dates })
+    .update({ name: trimmedName, dates: isUndecided ? [] : dates, is_undecided: isUndecided })
     .eq('id', id)
     .select()
     .single()

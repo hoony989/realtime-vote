@@ -4,7 +4,7 @@ import { hashPin, isValidPin } from '@/lib/pin'
 
 export async function POST(req: Request) {
   const body = await req.json()
-  const { roomId, name, dates, pin } = body
+  const { roomId, name, dates, pin, is_undecided } = body
 
   if (typeof roomId !== 'string' || !roomId) {
     return NextResponse.json({ error: 'roomId가 필요해요.' }, { status: 400 })
@@ -13,7 +13,8 @@ export async function POST(req: Request) {
   if (!trimmedName) {
     return NextResponse.json({ error: '이름을 입력해주세요.' }, { status: 400 })
   }
-  if (!Array.isArray(dates) || dates.length === 0 || !dates.every((d) => typeof d === 'string')) {
+  const isUndecided = !!is_undecided
+  if (!isUndecided && (!Array.isArray(dates) || dates.length === 0 || !dates.every((d) => typeof d === 'string'))) {
     return NextResponse.json({ error: '날짜를 선택해주세요.' }, { status: 400 })
   }
   if (!isValidPin(pin)) {
@@ -37,7 +38,8 @@ export async function POST(req: Request) {
       room_id: roomId,
       voter_id: crypto.randomUUID(),
       name: trimmedName,
-      dates,
+      dates: isUndecided ? [] : dates,
+      is_undecided: isUndecided,
     })
     .select()
     .single()

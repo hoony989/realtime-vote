@@ -46,6 +46,7 @@ export interface Database {
           voter_id: string
           name: string
           dates: string[]
+          is_undecided: boolean
           created_at: string
         }
         Insert: {
@@ -54,6 +55,7 @@ export interface Database {
           voter_id: string
           name?: string
           dates: string[]
+          is_undecided?: boolean
           created_at?: string
         }
         Update: {
@@ -62,6 +64,7 @@ export interface Database {
           voter_id?: string
           name?: string
           dates?: string[]
+          is_undecided?: boolean
           created_at?: string
         }
         Relationships: []

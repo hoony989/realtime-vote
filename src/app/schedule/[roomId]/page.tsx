@@ -7,7 +7,7 @@ import type { Room, Schedule } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { CalendarDays, Users, Copy, Lock, X, Trash2 } from 'lucide-react'
+import { CalendarDays, Users, Copy, Lock, X, Trash2, HelpCircle } from 'lucide-react'
 import { QRCodeCanvas } from 'qrcode.react'
 import { DayPicker, type DateRange, type DayButtonProps } from 'react-day-picker'
 import { ko } from 'date-fns/locale'
@@ -143,6 +143,7 @@ export default function SchedulePage() {
   const [name, setName] = useState('')
   const [pin, setPin] = useState('')
   const [range, setRange] = useState<DateRange | undefined>(undefined)
+  const [isUndecided, setIsUndecided] = useState(false)
   const [loading, setLoading] = useState(false)
 
   const [pinTarget, setPinTarget] = useState<Schedule | null>(null)
@@ -160,7 +161,7 @@ export default function SchedulePage() {
 
     const { data: schedData } = await supabase
       .from('schedules')
-      .select('id, room_id, voter_id, name, dates, created_at')
+      .select('id, room_id, voter_id, name, dates, is_undecided, created_at')
       .eq('room_id', roomId)
       .order('created_at')
     if (schedData) setSchedules(schedData)
@@ -185,6 +186,7 @@ export default function SchedulePage() {
     setName('')
     setPin('')
     setRange(undefined)
+    setIsUndecided(false)
   }
 
   const handleSubmit = async () => {
@@ -197,21 +199,27 @@ export default function SchedulePage() {
       toast.error('비밀번호는 숫자 4자리로 입력해주세요.')
       return
     }
-    if (!range?.from || !range?.to) {
+    if (!isUndecided && (!range?.from || !range?.to)) {
       toast.error('캘린더에서 기간을 선택해주세요.')
       return
     }
 
-    const dates = eachDayOfInterval({ start: range.from, end: range.to })
-      .map((d) => format(d, 'yyyy-MM-dd'))
-      .sort()
+    const dates = isUndecided
+      ? []
+      : eachDayOfInterval({ start: range!.from!, end: range!.to! })
+          .map((d) => format(d, 'yyyy-MM-dd'))
+          .sort()
 
     setLoading(true)
     try {
       const res = await fetch(editingId ? `/api/schedule-entries/${editingId}` : '/api/schedule-entries', {
         method: editingId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editingId ? { pin, name: trimmedName, dates } : { roomId, name: trimmedName, dates, pin }),
+        body: JSON.stringify(
+          editingId
+            ? { pin, name: trimmedName, dates, is_undecided: isUndecided }
+            : { roomId, name: trimmedName, dates, pin, is_undecided: isUndecided }
+        ),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -276,10 +284,15 @@ export default function SchedulePage() {
         }
 
         const sorted = [...data.schedule.dates].sort()
+        const undec = !!data.schedule.is_undecided
         setEditingId(data.schedule.id)
         setName(data.schedule.name)
         setPin(pinModalInput)
-        setRange({ from: parseISO(sorted[0]), to: parseISO(sorted[sorted.length - 1]) })
+        setIsUndecided(undec)
+        setRange(undec || sorted.length === 0
+          ? undefined
+          : { from: parseISO(sorted[0]), to: parseISO(sorted[sorted.length - 1]) }
+        )
         setPinTarget(null)
         toast.success('확인됐어요. 일정을 수정해주세요.')
       }
@@ -290,6 +303,7 @@ export default function SchedulePage() {
 
   const dateMap = buildDateMap(schedules)
   const maxCount = Math.max(...Array.from(dateMap.values()).map((v) => v.length), 1)
+  const undecidedCount = schedules.filter((s) => s.is_undecided).length
   const participantUrl = typeof window !== 'undefined' ? window.location.href : ''
 
   const copyLink = async () => {
@@ -435,7 +449,11 @@ export default function SchedulePage() {
               className="w-32 flex-shrink-0 bg-white border-slate-300 tracking-widest"
             />
             <div className="flex-1 min-w-[140px] flex items-center px-3 rounded-md border border-slate-300 bg-slate-50 text-sm">
-              {range?.from && range?.to ? (
+              {isUndecided ? (
+                <span className="text-amber-600 font-medium flex items-center gap-1.5">
+                  <HelpCircle className="w-3.5 h-3.5" /> 미정
+                </span>
+              ) : range?.from && range?.to ? (
                 <span className="text-slate-800">
                   {format(range.from, 'M/d (eee)', { locale: ko })} ~ {format(range.to, 'M/d (eee)', { locale: ko })}
                   <span className="text-slate-400 ml-1.5">({rangeDays}일)</span>
@@ -447,22 +465,35 @@ export default function SchedulePage() {
             <Button
               className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
               onClick={handleSubmit}
-              disabled={loading || !range?.from || !range?.to || !name.trim() || pin.length !== 4}
+              disabled={loading || !name.trim() || pin.length !== 4 || (!isUndecided && (!range?.from || !range?.to))}
             >
               {loading ? '처리 중...' : editingId ? '수정하기' : '등록하기'}
             </Button>
           </div>
-          <p className="text-xs text-slate-400 mt-2">
+          <label className="flex items-center gap-2 cursor-pointer mt-2.5">
+            <input
+              type="checkbox"
+              checked={isUndecided}
+              onChange={(e) => {
+                setIsUndecided(e.target.checked)
+                if (e.target.checked) setRange(undefined)
+              }}
+              className="w-4 h-4 accent-amber-500"
+            />
+            <span className="text-sm text-slate-600">아직 날짜 미정 (나중에 수정할 수 있어요)</span>
+          </label>
+          <p className="text-xs text-slate-400 mt-1.5">
             비밀번호는 나중에 내 일정을 수정할 때 필요해요. 잊지 않게 기억해주세요.
           </p>
         </div>
 
         {/* 통계 카드 */}
-        <div className="grid grid-cols-3 gap-3 mb-5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
           {[
             { label: '참여자', value: schedules.length, icon: Users, color: 'text-blue-500' },
             { label: '선택된 날짜 수', value: dateMap.size, icon: CalendarDays, color: 'text-emerald-500' },
             { label: '최다 겹침', value: maxCount > 1 ? `${maxCount}명` : '-', icon: Users, color: 'text-orange-500' },
+            { label: '날짜 미정', value: undecidedCount > 0 ? `${undecidedCount}명` : '-', icon: HelpCircle, color: 'text-amber-500' },
           ].map(({ label, value, icon: Icon, color }) => (
             <div key={label} className="rounded-xl border border-slate-300 bg-white p-4 shadow-sm">
               <Icon className={`w-5 h-5 ${color} mb-2`} />
@@ -473,7 +504,7 @@ export default function SchedulePage() {
         </div>
 
         {/* 통합 캘린더: 방 생성 시 선택한 기간(연-월)만 표시, 히트맵 + 내 선택 동시 표시 */}
-        <div ref={containerRef} className="relative rounded-xl border border-slate-300 bg-white p-4 shadow-sm mb-5">
+        <div ref={containerRef} className={`relative rounded-xl border border-slate-300 bg-white p-4 shadow-sm mb-5 transition-opacity ${isUndecided ? 'opacity-40 pointer-events-none select-none' : ''}`}>
           <div className="flex items-center justify-between mb-2">
             <h2 className="font-semibold text-slate-900">일정 비교 캘린더 ({monthsLabel})</h2>
             <div className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -596,10 +627,14 @@ export default function SchedulePage() {
                           <Lock className="w-2.5 h-2.5 text-slate-400" />
                           {s.name}
                         </span>
-                        <span className="text-xs text-slate-500 mr-2">
-                          {sorted.length > 0 && `${format(parseISO(sorted[0]), 'M/d')} ~ ${format(parseISO(sorted[sorted.length - 1]), 'M/d')} · `}
-                          {s.dates.length}일
-                        </span>
+                        {s.is_undecided ? (
+                          <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium mr-2">미정</span>
+                        ) : (
+                          <span className="text-xs text-slate-500 mr-2">
+                            {sorted.length > 0 && `${format(parseISO(sorted[0]), 'M/d')} ~ ${format(parseISO(sorted[sorted.length - 1]), 'M/d')} · `}
+                            {s.dates.length}일
+                          </span>
+                        )}
                       </button>
                       <button
                         onClick={() => openDeletePinModal(s)}
