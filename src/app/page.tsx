@@ -6,6 +6,7 @@ const gowunDodum = Gowun_Dodum({ subsets: ['latin'], weight: '400' })
 const mono = JetBrains_Mono({ subsets: ['latin'], weight: '500' })
 
 const ACCENT = '#BF3A2C'
+const CARD_RADIUS = '16px 13px 19px 15px'
 
 type Entry = {
   no: string
@@ -43,6 +44,28 @@ const entries: Entry[] = [
   },
 ]
 
+function HandArrow({ className }: { className?: string }) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 14 14"
+      className={className}
+      style={{ filter: 'url(#wobble)' }}
+      aria-hidden
+    >
+      <polyline
+        points="4,2 11,7 4,12"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 export default function Home() {
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#F5F0E6] px-6 py-20 sm:px-12">
@@ -55,6 +78,18 @@ export default function Home() {
         }
       `}</style>
       <div className="grain" />
+      <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
+        <defs>
+          <filter id="wobble" x="-30%" y="-30%" width="160%" height="160%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.045 0.055" numOctaves="2" seed="7" result="n" />
+            <feDisplacementMap in="SourceGraphic" in2="n" scale="3.4" xChannelSelector="R" yChannelSelector="G" />
+          </filter>
+          <filter id="wobbleBig" x="-20%" y="-20%" width="140%" height="140%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.015 0.02" numOctaves="2" seed="7" result="n" />
+            <feDisplacementMap in="SourceGraphic" in2="n" scale="9" xChannelSelector="R" yChannelSelector="G" />
+          </filter>
+        </defs>
+      </svg>
 
       <div className="relative mx-auto max-w-2xl">
         <header className="relative mb-16 sm:mb-20">
@@ -62,7 +97,7 @@ export default function Home() {
             className="mb-5 flex items-center gap-2.5"
             style={{ animation: 'rise 0.7s ease both' }}
           >
-            <span className="h-2 w-2 rotate-45" style={{ background: ACCENT }} />
+            <span className="h-2 w-2 rotate-45" style={{ background: ACCENT, filter: 'url(#wobble)' }} />
             <span className={`${mono.className} text-[11px] tracking-[0.25em] text-black/45`}>
               사내 업무 도구
             </span>
@@ -73,15 +108,21 @@ export default function Home() {
             style={{ animation: 'rise 0.7s ease 0.08s both' }}
           >
             <span className="block text-[26px] sm:text-[32px]">막내,</span>
-            <span className="block text-[92px] sm:text-[140px]">Yaho~</span>
+            <span className="block text-[92px] sm:text-[140px]" style={{ filter: 'url(#wobbleBig)' }}>
+              Yaho~
+            </span>
           </h1>
 
           <div
-            className="absolute right-0 top-0 hidden h-[88px] w-[88px] -rotate-[10deg] items-center justify-center rounded-full border sm:flex"
-            style={{ animation: 'rise 0.8s ease 0.2s both', borderColor: `${ACCENT}B3` }}
+            className="absolute right-0 top-0 hidden h-[88px] w-[88px] items-center justify-center sm:flex"
+            style={{ animation: 'rise 0.8s ease 0.2s both' }}
           >
             <div
-              className={`${mono.className} text-center text-[10px] leading-tight tracking-widest`}
+              className="absolute inset-0 rounded-full border"
+              style={{ borderColor: `${ACCENT}B3`, transform: 'rotate(-10deg)', filter: 'url(#wobble)' }}
+            />
+            <div
+              className={`${mono.className} relative text-center text-[10px] leading-tight tracking-widest`}
               style={{ color: `${ACCENT}CC` }}
             >
               TOOLKIT
@@ -92,20 +133,19 @@ export default function Home() {
         </header>
 
         <div
-          className="mb-2 h-px w-full bg-black/10"
-          style={{ animation: 'rise 0.7s ease 0.25s both' }}
+          className="mb-2 h-px w-full bg-black/15"
+          style={{ animation: 'rise 0.7s ease 0.25s both', filter: 'url(#wobble)' }}
         />
 
         <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-4">
           {entries.map((entry, i) => {
-            const cardClass = `group relative flex flex-col gap-3 rounded-2xl border p-5 transition-colors duration-300 ${
-              entry.soon
-                ? 'border-dashed border-black/15'
-                : 'border-black/10 hover:border-black/25 hover:bg-black/[0.02]'
-            }`
             const cardStyle = { animation: `rise 0.6s ease ${0.3 + i * 0.08}s both` }
+            const borderStyle = {
+              borderRadius: CARD_RADIUS,
+              filter: 'url(#wobble)',
+            }
             const content = (
-              <>
+              <div className="relative flex flex-col gap-3 p-5">
                 <div className="flex items-center justify-between">
                   <span
                     className={`${mono.className} text-sm tracking-wider transition-colors duration-300 ${
@@ -115,12 +155,7 @@ export default function Home() {
                     {entry.soon ? '+' : entry.no}
                   </span>
                   {!entry.soon && (
-                    <span
-                      className="-translate-x-1 text-base text-black/25 opacity-0 transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100 group-hover:text-[#BF3A2C]"
-                      aria-hidden
-                    >
-                      →
-                    </span>
+                    <HandArrow className="-translate-x-1 text-black/25 opacity-0 transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100 group-hover:text-[#BF3A2C]" />
                   )}
                 </div>
 
@@ -147,19 +182,24 @@ export default function Home() {
                 >
                   {entry.tag}
                 </span>
-              </>
+              </div>
             )
 
             if (entry.soon) {
               return (
-                <div key={entry.no} className={cardClass} style={cardStyle}>
+                <div key={entry.no} className="group relative block" style={cardStyle}>
+                  <div className="absolute inset-0 border border-dashed border-black/20" style={borderStyle} />
                   {content}
                 </div>
               )
             }
 
             return (
-              <Link key={entry.no} href={entry.href} className={cardClass} style={cardStyle}>
+              <Link key={entry.no} href={entry.href} className="group relative block" style={cardStyle}>
+                <div
+                  className="absolute inset-0 border border-black/25 transition-colors duration-300 group-hover:border-[#BF3A2C]/60 group-hover:bg-black/[0.02]"
+                  style={borderStyle}
+                />
                 {content}
               </Link>
             )
@@ -170,7 +210,7 @@ export default function Home() {
           className={`${mono.className} mt-12 flex items-center gap-2 text-[11px] tracking-widest text-black/35`}
           style={{ animation: 'rise 0.6s ease 0.6s both' }}
         >
-          <span className="h-1.5 w-1.5 rotate-45" style={{ background: `${ACCENT}99` }} />
+          <span className="h-1.5 w-1.5 rotate-45" style={{ background: `${ACCENT}99`, filter: 'url(#wobble)' }} />
           메뉴는 계속 추가됩니다
         </div>
       </div>
