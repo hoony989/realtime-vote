@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "실시간 투표",
-  description: "QR 코드로 참여하는 실시간 투표 + AI 요약 인사이트",
+  title: "막내, Yaho~",
+  description: "사내 업무 도구 모음 — 라이브 투표와 일정 조율을 한 곳에서",
 };
 
 export default function RootLayout({
