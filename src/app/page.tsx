@@ -1,356 +1,179 @@
-'use client'
+import Link from 'next/link'
+import { Gowun_Batang, Gowun_Dodum, JetBrains_Mono } from 'next/font/google'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { toast } from 'sonner'
-import { Plus, Trash2, Vote, CalendarDays } from 'lucide-react'
+const gowunBatang = Gowun_Batang({ subsets: ['latin'], weight: '700' })
+const gowunDodum = Gowun_Dodum({ subsets: ['latin'], weight: '400' })
+const mono = JetBrains_Mono({ subsets: ['latin'], weight: '500' })
 
-type Tab = 'vote' | 'schedule'
+const ACCENT = '#BF3A2C'
 
-const CURRENT_YEAR = new Date().getFullYear()
-const YEAR_OPTIONS = [CURRENT_YEAR, CURRENT_YEAR + 1]
-const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1)
-
-function expandMonthRange(startYear: number, startMonth: number, endYear: number, endMonth: number): string[] {
-  const result: string[] = []
-  let y = startYear
-  let m = startMonth
-  let guard = 0
-  while ((y < endYear || (y === endYear && m <= endMonth)) && guard < 24) {
-    result.push(`${y}-${String(m).padStart(2, '0')}`)
-    m += 1
-    if (m > 12) {
-      m = 1
-      y += 1
-    }
-    guard += 1
-  }
-  return result
+type Entry = {
+  no: string
+  title: string
+  desc: string
+  tag: string
+  href: string
+  soon: boolean
 }
 
+const entries: Entry[] = [
+  {
+    no: '01',
+    title: '라이브 투표',
+    desc: '질문을 올리고 QR로 모아 실시간 결과를 확인해요',
+    tag: 'LIVE',
+    href: '/vote',
+    soon: false,
+  },
+  {
+    no: '02',
+    title: '일정 조율',
+    desc: '휴가와 일정을 모아 겹치는 날을 한눈에 확인해요',
+    tag: 'SCHEDULE',
+    href: '/schedule',
+    soon: false,
+  },
+  {
+    no: '03',
+    title: '다음 도구',
+    desc: '곧 새로운 도구가 추가될 예정이에요',
+    tag: 'SOON',
+    href: '',
+    soon: true,
+  },
+]
+
 export default function Home() {
-  const router = useRouter()
-  const [tab, setTab] = useState<Tab>('vote')
-
-  // 투표 상태
-  const [title, setTitle] = useState('')
-  const [question, setQuestion] = useState('')
-  const [options, setOptions] = useState(['', ''])
-  const [multiSelect, setMultiSelect] = useState(false)
-  const [loading, setLoading] = useState(false)
-
-  // 일정 비교 상태
-  const [schedTitle, setSchedTitle] = useState('')
-  const [schedDesc, setSchedDesc] = useState('')
-  const [schedLoading, setSchedLoading] = useState(false)
-  const [startYear, setStartYear] = useState(CURRENT_YEAR)
-  const [startMonth, setStartMonth] = useState(7)
-  const [endYear, setEndYear] = useState(CURRENT_YEAR)
-  const [endMonth, setEndMonth] = useState(9)
-
-  const addOption = () => {
-    if (options.length < 10) setOptions([...options, ''])
-  }
-
-  const removeOption = (i: number) => {
-    if (options.length > 2) setOptions(options.filter((_, idx) => idx !== i))
-  }
-
-  const updateOption = (i: number, value: string) => {
-    const next = [...options]
-    next[i] = value
-    setOptions(next)
-  }
-
-  const handleCreateVote = async () => {
-    if (!title.trim() || !question.trim()) {
-      toast.error('제목과 질문을 입력해주세요.')
-      return
-    }
-    const validOptions = options.filter((o) => o.trim())
-    if (validOptions.length < 2) {
-      toast.error('선택지를 2개 이상 입력해주세요.')
-      return
-    }
-
-    setLoading(true)
-    try {
-      const { data: room, error: roomError } = await supabase
-        .from('rooms')
-        .insert({ title, question, multi_select: multiSelect, status: 'waiting', type: 'vote' })
-        .select()
-        .single()
-
-      if (roomError) throw roomError
-
-      const { error: optError } = await supabase.from('options').insert(
-        validOptions.map((label, i) => ({
-          room_id: room.id,
-          label: label.trim(),
-          sort_order: i,
-        }))
-      )
-
-      if (optError) throw optError
-
-      toast.success('투표방이 생성됐어요!')
-      router.push(`/admin/${room.id}?token=${room.admin_token}`)
-    } catch {
-      toast.error('투표방 생성에 실패했어요.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleCreateSchedule = async () => {
-    if (!schedTitle.trim()) {
-      toast.error('제목을 입력해주세요.')
-      return
-    }
-
-    const months = expandMonthRange(startYear, startMonth, endYear, endMonth)
-    if (months.length === 0) {
-      toast.error('종료월이 시작월보다 빠를 수 없어요.')
-      return
-    }
-    if (months.length > 12) {
-      toast.error('한 번에 최대 12개월까지 선택할 수 있어요.')
-      return
-    }
-
-    setSchedLoading(true)
-    try {
-      const { data: room, error } = await supabase
-        .from('rooms')
-        .insert({
-          title: schedTitle,
-          question: schedDesc.trim() || '휴가 일정을 등록해주세요.',
-          multi_select: false,
-          status: 'open',
-          type: 'schedule',
-          months,
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-
-      toast.success('일정 비교방이 생성됐어요!')
-      router.push(`/schedule/${room.id}`)
-    } catch {
-      toast.error('생성에 실패했어요.')
-    } finally {
-      setSchedLoading(false)
-    }
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-lg">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-blue-600 rounded-2xl mb-4">
-            {tab === 'vote' ? <Vote className="w-7 h-7 text-white" /> : <CalendarDays className="w-7 h-7 text-white" />}
+    <main className="relative min-h-screen overflow-hidden bg-[#F5F0E6] px-6 py-20 sm:px-12">
+      <style>{`
+        @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+        .grain {
+          position: fixed; inset: 0; pointer-events: none; opacity: 0.05; mix-blend-mode: multiply;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+          background-size: 180px 180px;
+        }
+      `}</style>
+      <div className="grain" />
+
+      <div className="relative mx-auto max-w-2xl">
+        <header className="relative mb-16 sm:mb-20">
+          <div
+            className="mb-5 flex items-center gap-2.5"
+            style={{ animation: 'rise 0.7s ease both' }}
+          >
+            <span className="h-2 w-2 rotate-45" style={{ background: ACCENT }} />
+            <span className={`${mono.className} text-[11px] tracking-[0.25em] text-black/45`}>
+              사내 업무 도구
+            </span>
           </div>
-          <h1 className="text-3xl font-bold text-slate-900">실시간 투표</h1>
-          <p className="text-slate-500 mt-2">QR 코드로 참여하는 실시간 투표 + 일정 비교</p>
-        </div>
 
-        {/* 탭 */}
-        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-4">
-          <button
-            onClick={() => setTab('vote')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
-              tab === 'vote' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-            }`}
+          <h1
+            className={`${gowunBatang.className} leading-[1.05] text-[#1F1B16]`}
+            style={{ animation: 'rise 0.7s ease 0.08s both' }}
           >
-            <Vote className="w-4 h-4" /> 투표 만들기
-          </button>
-          <button
-            onClick={() => setTab('schedule')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
-              tab === 'schedule' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-            }`}
+            <span className="block text-[26px] sm:text-[32px]">막내,</span>
+            <span className="block text-[92px] sm:text-[140px]">Yaho~</span>
+          </h1>
+
+          <div
+            className="absolute right-0 top-0 hidden h-[88px] w-[88px] -rotate-[10deg] items-center justify-center rounded-full border sm:flex"
+            style={{ animation: 'rise 0.8s ease 0.2s both', borderColor: `${ACCENT}B3` }}
           >
-            <CalendarDays className="w-4 h-4" /> 일정 비교
-          </button>
-        </div>
+            <div
+              className={`${mono.className} text-center text-[10px] leading-tight tracking-widest`}
+              style={{ color: `${ACCENT}CC` }}
+            >
+              TOOLKIT
+              <br />
+              <span className="text-[8px] opacity-70">EST.2026</span>
+            </div>
+          </div>
+        </header>
 
-        {tab === 'vote' ? (
-          <Card className="shadow-lg border-0">
-            <CardHeader>
-              <CardTitle className="text-lg">새 투표 만들기</CardTitle>
-              <CardDescription>투표방을 만들고 QR 코드로 공유하세요</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="title">투표 제목</Label>
-                <Input
-                  id="title"
-                  placeholder="예: 2024년 팀 워크샵 장소 선정"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                />
-              </div>
+        <div
+          className="mb-2 h-px w-full bg-black/10"
+          style={{ animation: 'rise 0.7s ease 0.25s both' }}
+        />
 
-              <div className="space-y-2">
-                <Label htmlFor="question">질문</Label>
-                <Textarea
-                  id="question"
-                  placeholder="예: 이번 워크샵 장소로 어디가 좋을까요?"
-                  value={question}
-                  onChange={(e) => setQuestion(e.target.value)}
-                  rows={2}
-                />
-              </div>
-
-              <div className="space-y-3">
-                <Label>선택지</Label>
-                {options.map((opt, i) => (
-                  <div key={i} className="flex gap-2">
-                    <Input
-                      placeholder={`선택지 ${i + 1}`}
-                      value={opt}
-                      onChange={(e) => updateOption(i, e.target.value)}
-                    />
-                    {options.length > 2 && (
-                      <Button variant="ghost" size="icon" onClick={() => removeOption(i)}>
-                        <Trash2 className="w-4 h-4 text-slate-400" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
-                {options.length < 10 && (
-                  <Button variant="outline" size="sm" onClick={addOption} className="w-full">
-                    <Plus className="w-4 h-4 mr-1" /> 선택지 추가
-                  </Button>
-                )}
-              </div>
-
-              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                <input
-                  id="multi"
-                  type="checkbox"
-                  checked={multiSelect}
-                  onChange={(e) => setMultiSelect(e.target.checked)}
-                  className="w-4 h-4 accent-blue-600"
-                />
-                <Label htmlFor="multi" className="cursor-pointer text-sm">
-                  복수 선택 허용
-                </Label>
-              </div>
-
-              <Button
-                className="w-full bg-blue-600 hover:bg-blue-700 h-12 text-base"
-                onClick={handleCreateVote}
-                disabled={loading}
-              >
-                {loading ? '생성 중...' : '투표방 만들기'}
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="shadow-lg border-0">
-            <CardHeader>
-              <CardTitle className="text-lg">일정 비교 방 만들기</CardTitle>
-              <CardDescription>팀원들이 휴가 일정을 등록하고 겹치는 날짜를 한눈에 확인하세요</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="sched-title">제목</Label>
-                <Input
-                  id="sched-title"
-                  placeholder="예: 7월 휴가 일정 취합"
-                  value={schedTitle}
-                  onChange={(e) => setSchedTitle(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="sched-desc">설명 (선택)</Label>
-                <Textarea
-                  id="sched-desc"
-                  placeholder="예: 7월 중 휴가 예정일을 모두 선택해주세요"
-                  value={schedDesc}
-                  onChange={(e) => setSchedDesc(e.target.value)}
-                  rows={2}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>표시할 기간 선택</Label>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-slate-500 w-7">시작</span>
-                    <select
-                      value={startYear}
-                      onChange={(e) => setStartYear(Number(e.target.value))}
-                      className="h-9 px-2 rounded-md border border-slate-300 bg-white text-sm"
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-4">
+          {entries.map((entry, i) => {
+            const cardClass = `group relative flex flex-col gap-3 rounded-2xl border p-5 transition-colors duration-300 ${
+              entry.soon
+                ? 'border-dashed border-black/15'
+                : 'border-black/10 hover:border-black/25 hover:bg-black/[0.02]'
+            }`
+            const cardStyle = { animation: `rise 0.6s ease ${0.3 + i * 0.08}s both` }
+            const content = (
+              <>
+                <div className="flex items-center justify-between">
+                  <span
+                    className={`${mono.className} text-sm tracking-wider transition-colors duration-300 ${
+                      entry.soon ? 'text-black/30' : 'text-black/35 group-hover:text-[#BF3A2C]'
+                    }`}
+                  >
+                    {entry.soon ? '+' : entry.no}
+                  </span>
+                  {!entry.soon && (
+                    <span
+                      className="-translate-x-1 text-base text-black/25 opacity-0 transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100 group-hover:text-[#BF3A2C]"
+                      aria-hidden
                     >
-                      {YEAR_OPTIONS.map((y) => (
-                        <option key={y} value={y}>{y}년</option>
-                      ))}
-                    </select>
-                    <select
-                      value={startMonth}
-                      onChange={(e) => setStartMonth(Number(e.target.value))}
-                      className="h-9 px-2 rounded-md border border-slate-300 bg-white text-sm"
-                    >
-                      {MONTH_OPTIONS.map((m) => (
-                        <option key={m} value={m}>{m}월</option>
-                      ))}
-                    </select>
-                  </div>
-                  <span className="text-slate-400">~</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-slate-500 w-7">종료</span>
-                    <select
-                      value={endYear}
-                      onChange={(e) => setEndYear(Number(e.target.value))}
-                      className="h-9 px-2 rounded-md border border-slate-300 bg-white text-sm"
-                    >
-                      {YEAR_OPTIONS.map((y) => (
-                        <option key={y} value={y}>{y}년</option>
-                      ))}
-                    </select>
-                    <select
-                      value={endMonth}
-                      onChange={(e) => setEndMonth(Number(e.target.value))}
-                      className="h-9 px-2 rounded-md border border-slate-300 bg-white text-sm"
-                    >
-                      {MONTH_OPTIONS.map((m) => (
-                        <option key={m} value={m}>{m}월</option>
-                      ))}
-                    </select>
-                  </div>
+                      →
+                    </span>
+                  )}
                 </div>
-                <p className="text-xs text-slate-500">
-                  연도가 달라도 괜찮아요 (예: 2026년 12월 ~ 2027년 3월). 최대 12개월까지 선택할 수 있고, 나중에는 바꿀 수 없어요.
-                </p>
-              </div>
 
-              <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-100">
-                <p className="text-sm text-emerald-700">
-                  ✅ 방을 만들면 QR 코드로 공유할 수 있어요. 팀원들이 달력에서 날짜를 선택하면 관리자 화면에서 겹치는 일정을 바로 확인할 수 있어요.
-                </p>
-              </div>
+                <h2
+                  className={`${gowunBatang.className} text-[22px] leading-tight ${
+                    entry.soon ? 'text-black/35' : 'text-[#1F1B16]'
+                  }`}
+                >
+                  {entry.title}
+                </h2>
 
-              <Button
-                className="w-full bg-emerald-600 hover:bg-emerald-700 h-12 text-base"
-                onClick={handleCreateSchedule}
-                disabled={schedLoading}
-              >
-                {schedLoading ? '생성 중...' : '일정 비교방 만들기'}
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+                <p
+                  className={`${gowunDodum.className} text-[13px] leading-relaxed ${
+                    entry.soon ? 'text-black/35' : 'text-black/55'
+                  }`}
+                >
+                  {entry.desc}
+                </p>
+
+                <span
+                  className={`${mono.className} mt-1 inline-block w-fit rounded-full border px-2 py-0.5 text-[9px] tracking-widest ${
+                    entry.soon ? 'border-black/10 text-black/30' : 'border-black/15 text-black/45'
+                  }`}
+                >
+                  {entry.tag}
+                </span>
+              </>
+            )
+
+            if (entry.soon) {
+              return (
+                <div key={entry.no} className={cardClass} style={cardStyle}>
+                  {content}
+                </div>
+              )
+            }
+
+            return (
+              <Link key={entry.no} href={entry.href} className={cardClass} style={cardStyle}>
+                {content}
+              </Link>
+            )
+          })}
+        </div>
+
+        <div
+          className={`${mono.className} mt-12 flex items-center gap-2 text-[11px] tracking-widest text-black/35`}
+          style={{ animation: 'rise 0.6s ease 0.6s both' }}
+        >
+          <span className="h-1.5 w-1.5 rotate-45" style={{ background: `${ACCENT}99` }} />
+          메뉴는 계속 추가됩니다
+        </div>
       </div>
-    </div>
+    </main>
   )
 }
