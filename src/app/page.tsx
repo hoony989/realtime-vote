@@ -98,7 +98,10 @@ export default function Home() {
             style={{ animation: 'rise 0.7s ease both' }}
           >
             <span className="h-2 w-2 rotate-45" style={{ background: ACCENT, filter: 'url(#wobble)' }} />
-            <span className={`${mono.className} text-[11px] tracking-[0.25em] text-black/45`}>
+            <span
+              className={`${mono.className} text-[11px] tracking-[0.25em] text-black/45`}
+              style={{ filter: 'url(#wobble)' }}
+            >
               사내 업무 도구
             </span>
           </div>
@@ -107,7 +110,9 @@ export default function Home() {
             className={`${gowunBatang.className} leading-[1.05] text-[#1F1B16]`}
             style={{ animation: 'rise 0.7s ease 0.08s both' }}
           >
-            <span className="block text-[26px] sm:text-[32px]">막내,</span>
+            <span className="block text-[26px] sm:text-[32px]" style={{ filter: 'url(#wobble)' }}>
+              막내,
+            </span>
             <span className="block text-[92px] sm:text-[140px]" style={{ filter: 'url(#wobbleBig)' }}>
               Yaho~
             </span>
@@ -123,7 +128,7 @@ export default function Home() {
             />
             <div
               className={`${mono.className} relative text-center text-[10px] leading-tight tracking-widest`}
-              style={{ color: `${ACCENT}CC` }}
+              style={{ color: `${ACCENT}CC`, filter: 'url(#wobble)' }}
             >
               TOOLKIT
               <br />
@@ -151,6 +156,7 @@ export default function Home() {
                     className={`${mono.className} text-sm tracking-wider transition-colors duration-300 ${
                       entry.soon ? 'text-black/30' : 'text-black/35 group-hover:text-[#BF3A2C]'
                     }`}
+                    style={{ filter: 'url(#wobble)' }}
                   >
                     {entry.soon ? '+' : entry.no}
                   </span>
@@ -163,6 +169,7 @@ export default function Home() {
                   className={`${gowunBatang.className} text-[22px] leading-tight ${
                     entry.soon ? 'text-black/35' : 'text-[#1F1B16]'
                   }`}
+                  style={{ filter: 'url(#wobble)' }}
                 >
                   {entry.title}
                 </h2>
@@ -171,6 +178,7 @@ export default function Home() {
                   className={`${gowunDodum.className} text-[13px] leading-relaxed ${
                     entry.soon ? 'text-black/35' : 'text-black/55'
                   }`}
+                  style={{ filter: 'url(#wobble)' }}
                 >
                   {entry.desc}
                 </p>
@@ -179,6 +187,7 @@ export default function Home() {
                   className={`${mono.className} mt-1 inline-block w-fit rounded-full border px-2 py-0.5 text-[9px] tracking-widest ${
                     entry.soon ? 'border-black/10 text-black/30' : 'border-black/15 text-black/45'
                   }`}
+                  style={{ filter: 'url(#wobble)' }}
                 >
                   {entry.tag}
                 </span>
@@ -211,7 +220,7 @@ export default function Home() {
           style={{ animation: 'rise 0.6s ease 0.6s both' }}
         >
           <span className="h-1.5 w-1.5 rotate-45" style={{ background: `${ACCENT}99`, filter: 'url(#wobble)' }} />
-          메뉴는 계속 추가됩니다
+          <span style={{ filter: 'url(#wobble)' }}>메뉴는 계속 추가됩니다</span>
         </div>
       </div>
     </main>
