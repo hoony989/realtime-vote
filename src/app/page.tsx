@@ -66,6 +66,63 @@ function HandArrow({ className }: { className?: string }) {
   )
 }
 
+function LadderIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 20" className={className} style={{ filter: 'url(#wobble)' }} aria-hidden>
+      <g fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+        <line x1="4" y1="1.5" x2="4" y2="18.5" />
+        <line x1="12" y1="1.5" x2="12" y2="18.5" />
+        <line x1="4" y1="5.5" x2="12" y2="5.5" />
+        <line x1="4" y1="10" x2="12" y2="10" />
+        <line x1="4" y1="14.5" x2="12" y2="14.5" />
+      </g>
+    </svg>
+  )
+}
+
+function DiceIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 18 18" className={className} style={{ filter: 'url(#wobble)' }} aria-hidden>
+      <rect x="1.2" y="1.2" width="15.6" height="15.6" rx="3.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
+      <g fill="currentColor">
+        <circle cx="5.2" cy="5.2" r="1.05" />
+        <circle cx="12.8" cy="5.2" r="1.05" />
+        <circle cx="9" cy="9" r="1.05" />
+        <circle cx="5.2" cy="12.8" r="1.05" />
+        <circle cx="12.8" cy="12.8" r="1.05" />
+      </g>
+    </svg>
+  )
+}
+
+function ScrewIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 20" className={className} style={{ filter: 'url(#wobble)' }} aria-hidden>
+      <g fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
+        <circle cx="8" cy="5" r="4" />
+        <line x1="4.5" y1="5" x2="11.5" y2="5" />
+        <line x1="8" y1="9" x2="8" y2="18" />
+        <line x1="5.8" y1="11.5" x2="10.2" y2="11.5" />
+        <line x1="5.8" y1="14.5" x2="10.2" y2="14.5" />
+      </g>
+    </svg>
+  )
+}
+
+function WindupKeyIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 20" className={className} style={{ filter: 'url(#wobble)' }} aria-hidden>
+      <g fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
+        <circle cx="8" cy="4.2" r="2.8" />
+        <line x1="8" y1="7" x2="8" y2="15" />
+        <line x1="4" y1="15" x2="12" y2="15" />
+        <line x1="4" y1="15" x2="4" y2="17.5" />
+        <line x1="12" y1="15" x2="12" y2="17.5" />
+      </g>
+    </svg>
+  )
+}
+
 export default function Home() {
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#F5F0E6] px-6 py-20 sm:px-12">
@@ -215,12 +272,33 @@ export default function Home() {
           })}
         </div>
 
-        <div
-          className={`${mono.className} mt-12 flex items-center gap-2 text-[11px] tracking-widest text-black/35`}
-          style={{ animation: 'rise 0.6s ease 0.6s both' }}
-        >
-          <span className="h-1.5 w-1.5 rotate-45" style={{ background: `${ACCENT}99`, filter: 'url(#wobble)' }} />
-          <span style={{ filter: 'url(#wobble)' }}>메뉴는 계속 추가됩니다</span>
+        <div className="mt-14 flex items-center gap-5" style={{ animation: 'rise 0.6s ease 0.6s both' }}>
+          <Link href="#" className="group/hidden relative text-black/25 transition-colors duration-300 hover:text-[#BF3A2C]">
+            <LadderIcon className="h-5 w-5 transition-transform duration-300 group-hover/hidden:-rotate-6" />
+            <span
+              className={`${gowunDodum.className} pointer-events-none absolute left-1/2 top-full mt-1.5 -translate-x-1/2 whitespace-nowrap text-[11px] text-black/45 opacity-0 transition-opacity duration-300 group-hover/hidden:opacity-100`}
+              style={{ filter: 'url(#wobble)' }}
+            >
+              사다리타기
+            </span>
+          </Link>
+
+          <Link href="#" className="group/hidden relative text-black/25 transition-colors duration-300 hover:text-[#BF3A2C]">
+            <DiceIcon className="h-5 w-5 transition-transform duration-300 group-hover/hidden:rotate-12" />
+            <span
+              className={`${gowunDodum.className} pointer-events-none absolute left-1/2 top-full mt-1.5 -translate-x-1/2 whitespace-nowrap text-[11px] text-black/45 opacity-0 transition-opacity duration-300 group-hover/hidden:opacity-100`}
+              style={{ filter: 'url(#wobble)' }}
+            >
+              부루마블
+            </span>
+          </Link>
+
+          <span className="text-black/10">
+            <ScrewIcon className="h-5 w-5" />
+          </span>
+          <span className="text-black/10">
+            <WindupKeyIcon className="h-5 w-5" />
+          </span>
         </div>
       </div>
     </main>
