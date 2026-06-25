@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import type { Room, Option, Vote, Opinion, OptionWithCount } from '@/lib/types'
+import { ROOM_PUBLIC_SELECT } from '@/lib/types'
+import type { PublicRoom, Option, Opinion, OptionWithCount, RoomVoteStats } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -42,15 +43,15 @@ const LABEL_COLORS = [
 export default function AdminPage() {
   const { roomId } = useParams<{ roomId: string }>()
   const searchParams = useSearchParams()
+  const token = searchParams.get('token') ?? ''
 
   const [isDark, setIsDark] = useState(true)
-  const [room, setRoom] = useState<Room | null>(null)
+  const [room, setRoom] = useState<PublicRoom | null>(null)
   const [options, setOptions] = useState<OptionWithCount[]>([])
   const [opinions, setOpinions] = useState<Opinion[]>([])
   const [uniqueVoters, setUniqueVoters] = useState(0)
   const [aiSummary, setAiSummary] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
-  const opEndRef = useRef<HTMLDivElement>(null)
 
   const voteUrl = typeof window !== 'undefined' ? `${window.location.origin}/vote/${roomId}` : ''
 
@@ -76,24 +77,19 @@ export default function AdminPage() {
   }
 
   const loadData = useCallback(async () => {
-    const { data: roomData } = await supabase.from('rooms').select('*').eq('id', roomId).single()
+    const { data: roomData } = await supabase
+      .from('rooms').select(ROOM_PUBLIC_SELECT).eq('id', roomId).single()
     if (roomData) setRoom(roomData)
 
     const { data: optData } = await supabase
       .from('options').select('*').eq('room_id', roomId).order('sort_order')
 
-    const { data: voteData } = await supabase
-      .from('votes').select('*').eq('room_id', roomId)
-
-    if (optData && voteData) {
-      const voters = new Set(voteData.map((v: Vote) => v.voter_id))
-      setUniqueVoters(voters.size)
-      setOptions(
-        optData.map((opt: Option) => ({
-          ...opt,
-          count: voteData.filter((v: Vote) => v.option_id === opt.id).length,
-        }))
-      )
+    // 옵션별 카운트와 고유 투표자 수는 DB에서 집계해 받는다(전 행 전송 방지).
+    const { data: statsData } = await supabase.rpc('get_room_vote_stats', { p_room_id: roomId })
+    const stats = (statsData as RoomVoteStats | null) ?? { unique_voters: 0, counts: {} }
+    setUniqueVoters(stats.unique_voters)
+    if (optData) {
+      setOptions(optData.map((opt: Option) => ({ ...opt, count: stats.counts[opt.id] ?? 0 })))
     }
 
     const { data: opData } = await supabase
@@ -112,20 +108,30 @@ export default function AdminPage() {
         setOpinions((prev) => [payload.new as Opinion, ...prev])
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, (payload) => {
-        setRoom(payload.new as Room)
+        setRoom(payload.new as PublicRoom)
       })
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
   }, [roomId, loadData])
 
-  const updateStatus = async (status: Room['status']) => {
-    const { error } = await supabase.from('rooms').update({ status }).eq('id', roomId)
-    if (error) toast.error('상태 변경 실패')
-    else {
-      setRoom((r) => r ? { ...r, status } : r)
-      toast.success(status === 'open' ? '투표가 시작됐어요!' : '투표가 종료됐어요!')
+  const updateStatus = async (status: PublicRoom['status']) => {
+    if (!token) {
+      toast.error('관리자 링크(토큰 포함)로 접속해야 상태를 바꿀 수 있어요.')
+      return
     }
+    const res = await fetch(`/api/rooms/${roomId}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, status }),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      toast.error(data.error ?? '상태 변경 실패')
+      return
+    }
+    setRoom((r) => r ? { ...r, status } : r)
+    toast.success(status === 'open' ? '투표가 시작됐어요!' : '투표가 종료됐어요!')
   }
 
   const generateSummary = async () => {
@@ -319,7 +325,6 @@ export default function AdminPage() {
                         </p>
                       </div>
                     ))}
-                    <div ref={opEndRef} />
                   </div>
                 )}
               </CardContent>

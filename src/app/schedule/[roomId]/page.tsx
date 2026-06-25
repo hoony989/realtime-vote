@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef, createContext, useContext } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo, createContext, useContext } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import type { Room, Schedule } from '@/lib/types'
+import { ROOM_PUBLIC_SELECT } from '@/lib/types'
+import type { PublicRoom, Schedule } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
@@ -136,7 +137,7 @@ function HeatDayButton(props: DayButtonProps) {
 
 export default function SchedulePage() {
   const { roomId } = useParams<{ roomId: string }>()
-  const [room, setRoom] = useState<Room | null>(null)
+  const [room, setRoom] = useState<PublicRoom | null>(null)
   const [schedules, setSchedules] = useState<Schedule[]>([])
 
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -156,7 +157,7 @@ export default function SchedulePage() {
   const containerRef = useRef<HTMLDivElement>(null)
 
   const loadData = useCallback(async () => {
-    const { data: roomData } = await supabase.from('rooms').select('*').eq('id', roomId).single()
+    const { data: roomData } = await supabase.from('rooms').select(ROOM_PUBLIC_SELECT).eq('id', roomId).single()
     if (roomData) setRoom(roomData)
 
     const { data: schedData } = await supabase
@@ -301,9 +302,9 @@ export default function SchedulePage() {
     }
   }
 
-  const dateMap = buildDateMap(schedules)
-  const maxCount = Math.max(...Array.from(dateMap.values()).map((v) => v.length), 1)
-  const undecidedCount = schedules.filter((s) => s.is_undecided).length
+  const dateMap = useMemo(() => buildDateMap(schedules), [schedules])
+  const maxCount = useMemo(() => Math.max(...Array.from(dateMap.values()).map((v) => v.length), 1), [dateMap])
+  const undecidedCount = useMemo(() => schedules.filter((s) => s.is_undecided).length, [schedules])
   const participantUrl = typeof window !== 'undefined' ? window.location.href : ''
 
   const copyLink = async () => {
@@ -322,10 +323,10 @@ export default function SchedulePage() {
     return `${format(parseISO(p.start), 'M/d', { locale: ko })} ~ ${format(parseISO(p.end), 'M/d', { locale: ko })}`
   }
 
-  const topDates = Array.from(dateMap.entries())
+  const topDates = useMemo(() => Array.from(dateMap.entries())
     .filter(([, people]) => people.length > 0)
     .sort((a, b) => b[1].length - a[1].length)
-    .slice(0, 5)
+    .slice(0, 5), [dateMap])
 
   const handleCellEnter = (dateStr: string, e: React.MouseEvent<HTMLButtonElement>) => {
     if (!dateMap.get(dateStr)?.length && !FOCUS_DAYS.has(dateStr) && !HOLIDAYS[dateStr]) return

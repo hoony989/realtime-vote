@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import type { Room, Option, Opinion } from '@/lib/types'
+import { ROOM_PUBLIC_SELECT } from '@/lib/types'
+import type { PublicRoom, Option, Opinion } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
@@ -23,7 +24,7 @@ function getVoterId() {
 
 export default function VotePage() {
   const { roomId } = useParams<{ roomId: string }>()
-  const [room, setRoom] = useState<Room | null>(null)
+  const [room, setRoom] = useState<PublicRoom | null>(null)
   const [options, setOptions] = useState<Option[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [voted, setVoted] = useState(false)
@@ -39,7 +40,7 @@ export default function VotePage() {
   }, [])
 
   const loadRoom = useCallback(async () => {
-    const { data: roomData } = await supabase.from('rooms').select('*').eq('id', roomId).single()
+    const { data: roomData } = await supabase.from('rooms').select(ROOM_PUBLIC_SELECT).eq('id', roomId).single()
     if (roomData) setRoom(roomData)
 
     const { data: optData } = await supabase
@@ -77,7 +78,7 @@ export default function VotePage() {
         setRecentOpinions((prev) => [payload.new as Opinion, ...prev].slice(0, 5))
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, (payload) => {
-        setRoom(payload.new as Room)
+        setRoom(payload.new as PublicRoom)
       })
       .subscribe()
 
