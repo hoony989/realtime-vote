@@ -153,6 +153,24 @@ export interface Database {
         }
         Relationships: []
       }
+      lunch_menus: {
+        Row: {
+          id: string
+          name: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -166,6 +184,7 @@ export type Option = Database['public']['Tables']['options']['Row']
 export type Vote = Database['public']['Tables']['votes']['Row']
 export type Opinion = Database['public']['Tables']['opinions']['Row']
 export type Schedule = Database['public']['Tables']['schedules']['Row']
+export type LunchMenu = Database['public']['Tables']['lunch_menus']['Row']
 
 export interface OptionWithCount extends Option {
   count: number
