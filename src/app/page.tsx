@@ -296,7 +296,7 @@ export default function Home() {
             </span>
           </Link>
 
-          <Link href="#" className="group/hidden relative text-black/25 transition-colors duration-300 hover:text-[#BF3A2C]">
+          <div className="group/hidden relative cursor-default text-black/25 transition-colors duration-300 hover:text-black/45">
             <LadderIcon className="h-5 w-5 transition-transform duration-300 group-hover/hidden:-rotate-6" />
             <span
               className={`${gowunDodum.className} pointer-events-none absolute left-1/2 top-full mt-1.5 -translate-x-1/2 whitespace-nowrap text-[11px] text-black/45 opacity-0 transition-opacity duration-300 group-hover/hidden:opacity-100`}
@@ -304,17 +304,17 @@ export default function Home() {
             >
               사다리타기
             </span>
-          </Link>
+          </div>
 
-          <Link href="#" className="group/hidden relative text-black/25 transition-colors duration-300 hover:text-[#BF3A2C]">
+          <div className="group/hidden relative cursor-default text-black/25 transition-colors duration-300 hover:text-black/45">
             <DiceIcon className="h-5 w-5 transition-transform duration-300 group-hover/hidden:rotate-12" />
             <span
               className={`${gowunDodum.className} pointer-events-none absolute left-1/2 top-full mt-1.5 -translate-x-1/2 whitespace-nowrap text-[11px] text-black/45 opacity-0 transition-opacity duration-300 group-hover/hidden:opacity-100`}
               style={{ filter: 'url(#wobble)' }}
             >
-              부루마블
+              주루마블
             </span>
-          </Link>
+          </div>
 
           <span className="text-black/10">
             <ScrewIcon className="h-5 w-5" />
