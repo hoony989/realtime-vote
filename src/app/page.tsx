@@ -286,7 +286,7 @@ export default function Home() {
         </div>
 
         <div className="mt-14 flex items-center gap-5" style={{ animation: 'rise 0.6s ease 0.6s both' }}>
-          <Link href="/lunch-preview" className="group/hidden relative text-black/25 transition-colors duration-300 hover:text-[#BF3A2C]">
+          <Link href="/lunch" className="group/hidden relative text-black/25 transition-colors duration-300 hover:text-[#BF3A2C]">
             <BowlIcon className="h-5 w-5 transition-transform duration-300 group-hover/hidden:-rotate-6" />
             <span
               className={`${gowunDodum.className} pointer-events-none absolute left-1/2 top-full mt-1.5 -translate-x-1/2 whitespace-nowrap text-[11px] text-black/45 opacity-0 transition-opacity duration-300 group-hover/hidden:opacity-100`}
