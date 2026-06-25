@@ -36,11 +36,11 @@ const entries: Entry[] = [
   },
   {
     no: '03',
-    title: '다음 도구',
-    desc: '곧 새로운 도구가 추가될 예정이에요',
-    tag: 'SOON',
-    href: '',
-    soon: true,
+    title: '회식 투표',
+    desc: '장소 후보를 올리고 팀원들이 투표해요',
+    tag: 'DINING',
+    href: '/dining',
+    soon: false,
   },
 ]
 

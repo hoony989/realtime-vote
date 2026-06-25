@@ -5,7 +5,7 @@ import type { Room, Schedule } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { Trash2, Copy, Vote, CalendarDays, Lock, RefreshCw, ChevronDown, ChevronUp, Users } from 'lucide-react'
+import { Trash2, Copy, Vote, CalendarDays, Lock, RefreshCw, ChevronDown, ChevronUp, Users, UtensilsCrossed } from 'lucide-react'
 import { format } from 'date-fns'
 
 export default function ManagePage() {
@@ -105,10 +105,16 @@ export default function ManagePage() {
     toast.success('삭제됐어요.')
   }
 
-  const linkFor = (room: Room) =>
-    `${window.location.origin}${room.type === 'schedule' ? `/schedule/${room.id}` : `/vote/${room.id}`}`
+  const linkFor = (room: Room) => {
+    if (room.type === 'schedule') return `${window.location.origin}/schedule/${room.id}`
+    if (room.type === 'dining') return `${window.location.origin}/dining/${room.id}`
+    return `${window.location.origin}/vote/${room.id}`
+  }
 
-  const adminLinkFor = (room: Room) => `${window.location.origin}/admin/${room.id}?token=${room.admin_token}`
+  const adminLinkFor = (room: Room) => {
+    if (room.type === 'dining') return `${window.location.origin}/dining/${room.id}/admin?token=${room.admin_token}`
+    return `${window.location.origin}/admin/${room.id}?token=${room.admin_token}`
+  }
 
   const copy = async (text: string) => {
     try {
@@ -181,11 +187,11 @@ export default function ManagePage() {
                     <div className="flex items-center gap-2 mb-1">
                       <span
                         className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
-                          room.type === 'schedule' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
+                          room.type === 'schedule' ? 'bg-emerald-100 text-emerald-700' : room.type === 'dining' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
                         }`}
                       >
-                        {room.type === 'schedule' ? <CalendarDays className="w-3 h-3" /> : <Vote className="w-3 h-3" />}
-                        {room.type === 'schedule' ? '일정 비교' : '투표'}
+                        {room.type === 'schedule' ? <CalendarDays className="w-3 h-3" /> : room.type === 'dining' ? <UtensilsCrossed className="w-3 h-3" /> : <Vote className="w-3 h-3" />}
+                        {room.type === 'schedule' ? '일정 비교' : room.type === 'dining' ? '회식 투표' : '투표'}
                       </span>
                       <span className="text-xs text-slate-400">
                         {format(new Date(room.created_at), 'yyyy-MM-dd HH:mm')}
@@ -199,7 +205,7 @@ export default function ManagePage() {
                       >
                         <Copy className="w-3 h-3" /> 참여 링크
                       </button>
-                      {room.type === 'vote' && (
+                      {(room.type === 'vote' || room.type === 'dining') && (
                         <button
                           onClick={() => copy(adminLinkFor(room))}
                           className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1"
