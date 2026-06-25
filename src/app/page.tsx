@@ -66,6 +66,19 @@ function HandArrow({ className }: { className?: string }) {
   )
 }
 
+function BowlIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 18 20" className={className} style={{ filter: 'url(#wobble)' }} aria-hidden>
+      <g fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+        <path d="M2 10 Q2 16.5 9 16.5 Q16 16.5 16 10" />
+        <line x1="1.5" y1="10" x2="16.5" y2="10" />
+        <path d="M6 6 Q6 4 7.5 3" />
+        <path d="M11 6 Q11 4 9.5 3" />
+      </g>
+    </svg>
+  )
+}
+
 function LadderIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 16 20" className={className} style={{ filter: 'url(#wobble)' }} aria-hidden>
@@ -273,6 +286,16 @@ export default function Home() {
         </div>
 
         <div className="mt-14 flex items-center gap-5" style={{ animation: 'rise 0.6s ease 0.6s both' }}>
+          <Link href="/lunch-preview" className="group/hidden relative text-black/25 transition-colors duration-300 hover:text-[#BF3A2C]">
+            <BowlIcon className="h-5 w-5 transition-transform duration-300 group-hover/hidden:-rotate-6" />
+            <span
+              className={`${gowunDodum.className} pointer-events-none absolute left-1/2 top-full mt-1.5 -translate-x-1/2 whitespace-nowrap text-[11px] text-black/45 opacity-0 transition-opacity duration-300 group-hover/hidden:opacity-100`}
+              style={{ filter: 'url(#wobble)' }}
+            >
+              점메추
+            </span>
+          </Link>
+
           <Link href="#" className="group/hidden relative text-black/25 transition-colors duration-300 hover:text-[#BF3A2C]">
             <LadderIcon className="h-5 w-5 transition-transform duration-300 group-hover/hidden:-rotate-6" />
             <span
