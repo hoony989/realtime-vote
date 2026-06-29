@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 // SK T타워 (중구 을지로 65, 을지로3가역 근처)
 const BASE_X = '126.9786'
 const BASE_Y = '37.5666'
-const RADIUS = '1000'
+const RADIUS = '3000'
 
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get('q')
