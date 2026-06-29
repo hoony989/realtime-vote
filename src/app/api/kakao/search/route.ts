@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// SK서린빌딩 (종로구 종로 26, 종각역 근처)
-const BASE_X = '126.9822'
-const BASE_Y = '37.5698'
+// SK T타워 (중구 을지로 65, 을지로3가역 근처)
+const BASE_X = '126.9786'
+const BASE_Y = '37.5666'
 const RADIUS = '1000'
 
 export async function GET(req: NextRequest) {
