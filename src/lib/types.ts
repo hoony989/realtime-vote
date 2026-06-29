@@ -171,6 +171,69 @@ export interface Database {
         }
         Relationships: []
       }
+      dining_venues: {
+        Row: {
+          id: string
+          room_id: string
+          name: string
+          description: string | null
+          location: string
+          cost_per_person: string | null
+          has_private_room: boolean
+          map_url: string | null
+          sort_order: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          room_id: string
+          name: string
+          description?: string | null
+          location: string
+          cost_per_person?: string | null
+          has_private_room?: boolean
+          map_url?: string | null
+          sort_order?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          room_id?: string
+          name?: string
+          description?: string | null
+          location?: string
+          cost_per_person?: string | null
+          has_private_room?: boolean
+          map_url?: string | null
+          sort_order?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
+      dining_votes: {
+        Row: {
+          id: string
+          room_id: string
+          venue_id: string
+          voter_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          room_id: string
+          venue_id: string
+          voter_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          room_id?: string
+          venue_id?: string
+          voter_id?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -196,5 +259,12 @@ export type Schedule = Database['public']['Tables']['schedules']['Row']
 export type LunchMenu = Database['public']['Tables']['lunch_menus']['Row']
 
 export interface OptionWithCount extends Option {
+  count: number
+}
+
+export type DiningVenue = Database['public']['Tables']['dining_venues']['Row']
+export type DiningVote = Database['public']['Tables']['dining_votes']['Row']
+
+export interface DiningVenueWithCount extends DiningVenue {
   count: number
 }
