@@ -16,7 +16,7 @@ const LABEL_COLORS = ['text-orange-400', 'text-amber-400', 'text-yellow-400', 't
 
 export default function DiningAdminPage() {
   const { roomId } = useParams<{ roomId: string }>()
-  useSearchParams() // token은 URL에만 존재, 보안은 obscurity
+  const searchParams = useSearchParams()
 
   const [isDark, setIsDark] = useState(true)
   const [room, setRoom] = useState<Room | null>(null)
@@ -72,8 +72,13 @@ export default function DiningAdminPage() {
   }, [roomId, loadData])
 
   const updateStatus = async (status: Room['status']) => {
-    const { error } = await supabase.from('rooms').update({ status }).eq('id', roomId)
-    if (error) toast.error('상태 변경 실패')
+    const token = searchParams.get('token')
+    const res = await fetch(`/api/rooms/${roomId}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, status }),
+    })
+    if (!res.ok) toast.error('상태 변경 실패')
     else {
       setRoom((r) => r ? { ...r, status } : r)
       toast.success(status === 'open' ? '투표가 시작됐어요!' : '투표가 종료됐어요!')

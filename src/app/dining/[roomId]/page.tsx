@@ -10,6 +10,15 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
+interface KakaoPlace {
+  place_name: string
+  road_address_name: string
+  address_name: string
+  place_url: string
+  category_name: string
+  distance: string
+}
+
 function getVoterId() {
   const key = 'realtime_vote_voter_id'
   let id = localStorage.getItem(key)
@@ -17,17 +26,12 @@ function getVoterId() {
   return id
 }
 
-// 같은 방의 dining_venues를 검색하지 않고 이 방 내 장소만 자동완성 대상으로 씀.
-// 실제 "DB 자동완성"은 다른 방에서 쓴 장소명을 전역 검색하는 형태인데
-// 현재 RLS 정책상 room_id 없이 전체 조회가 가능하므로 이름 기반으로 검색함.
-async function searchVenueDB(q: string): Promise<DiningVenue[]> {
-  if (!q.trim()) return []
-  const { data } = await supabase
-    .from('dining_venues')
-    .select('*')
-    .ilike('name', `%${q}%`)
-    .limit(5)
-  return data ?? []
+async function searchKakao(query: string): Promise<KakaoPlace[]> {
+  if (!query.trim()) return []
+  const res = await fetch(`/api/kakao/search?q=${encodeURIComponent(query)}`)
+  if (!res.ok) return []
+  const data = await res.json()
+  return data.documents ?? []
 }
 
 export default function DiningPage() {
@@ -40,28 +44,26 @@ export default function DiningPage() {
 
   // 새 장소 제안 폼
   const [suggestOpen, setSuggestOpen] = useState(false)
-  const [acQuery, setAcQuery] = useState('')
-  const [acResults, setAcResults] = useState<DiningVenue[]>([])
-  const [acOpen, setAcOpen] = useState(false)
   const [sugName, setSugName] = useState('')
   const [sugDesc, setSugDesc] = useState('')
   const [sugLocation, setSugLocation] = useState('')
   const [sugCost, setSugCost] = useState('')
   const [sugRoom, setSugRoom] = useState(false)
   const [sugMapUrl, setSugMapUrl] = useState('')
-  const [dbFilled, setDbFilled] = useState(false)
   const [sugLoading, setSugLoading] = useState(false)
-  const acTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // 카카오 자동완성
+  const [kakaoResults, setKakaoResults] = useState<KakaoPlace[]>([])
+  const [kakaoOpen, setKakaoOpen] = useState(false)
+  const kakaoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => { setVoterId(getVoterId()) }, [])
 
   const loadData = useCallback(async () => {
     const { data: roomData } = await supabase.from('rooms').select('*').eq('id', roomId).single()
     if (roomData) setRoom(roomData)
-
     const { data: venueData } = await supabase.from('dining_venues').select('*').eq('room_id', roomId).order('sort_order')
     if (venueData) setVenues(venueData)
-
     const { data: voteData } = await supabase.from('dining_votes').select('*').eq('room_id', roomId)
     if (voteData) setAllVotes(voteData)
   }, [roomId])
@@ -103,36 +105,29 @@ export default function DiningPage() {
     }
   }
 
-  // 자동완성
-  const onAcChange = (val: string) => {
-    setAcQuery(val)
+  const onSugNameChange = (val: string) => {
     setSugName(val)
-    setDbFilled(false)
-    if (acTimer.current) clearTimeout(acTimer.current)
-    if (!val.trim()) { setAcResults([]); setAcOpen(false); return }
-    acTimer.current = setTimeout(async () => {
-      const results = await searchVenueDB(val)
-      setAcResults(results)
-      setAcOpen(results.length > 0)
-    }, 200)
+    if (kakaoTimer.current) clearTimeout(kakaoTimer.current)
+    if (!val.trim()) { setKakaoResults([]); setKakaoOpen(false); return }
+    kakaoTimer.current = setTimeout(async () => {
+      const results = await searchKakao(val)
+      setKakaoResults(results)
+      setKakaoOpen(results.length > 0)
+    }, 300)
   }
 
-  const selectAcVenue = (v: DiningVenue) => {
-    setSugName(v.name)
-    setAcQuery(v.name)
-    setSugDesc(v.description ?? '')
-    setSugLocation(v.location)
-    setSugCost(v.cost_per_person ?? '')
-    setSugRoom(v.has_private_room)
-    setSugMapUrl(v.map_url ?? '')
-    setDbFilled(true)
-    setAcOpen(false)
+  const selectKakaoPlace = (p: KakaoPlace) => {
+    setSugName(p.place_name)
+    setSugLocation(p.road_address_name || p.address_name)
+    setSugMapUrl(p.place_url)
+    setKakaoResults([])
+    setKakaoOpen(false)
   }
 
   const resetSuggestForm = () => {
-    setSugName(''); setAcQuery(''); setSugDesc(''); setSugLocation('')
-    setSugCost(''); setSugRoom(false); setSugMapUrl(''); setDbFilled(false)
-    setAcOpen(false)
+    setSugName(''); setSugDesc(''); setSugLocation('')
+    setSugCost(''); setSugRoom(false); setSugMapUrl('')
+    setKakaoResults([]); setKakaoOpen(false)
   }
 
   const handleSuggestSubmit = async () => {
@@ -150,7 +145,6 @@ export default function DiningPage() {
         sort_order: venues.length,
       }).select().single()
       if (error) throw error
-
       await supabase.from('dining_votes').insert({ room_id: roomId, venue_id: venue.id, voter_id: voterId })
       toast.success('장소가 추가됐어요!')
       resetSuggestForm()
@@ -218,7 +212,6 @@ export default function DiningPage() {
               const isVoted = myVoteIds.has(venue.id)
               const count = voteCountFor(venue.id)
               const canVote = room.status === 'open'
-
               return (
                 <div
                   key={venue.id}
@@ -290,33 +283,37 @@ export default function DiningPage() {
 
             {suggestOpen && (
               <div className="mt-3 bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
-                <p className="text-sm font-bold text-slate-700">🔍 장소 검색 또는 직접 입력</p>
+                <p className="text-sm font-bold text-slate-700">🔍 장소 검색 (카카오)</p>
 
-                {/* 자동완성 */}
+                {/* 카카오 자동완성 */}
                 <div className="relative">
                   <Label className="text-xs font-semibold text-slate-500 mb-1 block">장소명 *</Label>
                   <Input
-                    placeholder="장소명 검색 또는 입력..."
-                    value={acQuery}
-                    onChange={(e) => onAcChange(e.target.value)}
-                    onBlur={() => setTimeout(() => setAcOpen(false), 150)}
+                    placeholder="장소명 입력 시 카카오에서 자동 검색..."
+                    value={sugName}
+                    onChange={(e) => onSugNameChange(e.target.value)}
+                    onBlur={() => setTimeout(() => setKakaoOpen(false), 150)}
                     autoComplete="off"
                   />
-                  {dbFilled && (
-                    <span className="inline-flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full mt-1 font-semibold">
-                      ✅ DB에서 정보를 불러왔어요
-                    </span>
-                  )}
-                  {acOpen && acResults.length > 0 && (
+                  {kakaoOpen && kakaoResults.length > 0 && (
                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-20 overflow-hidden">
-                      {acResults.map((v) => (
-                        <button key={v.id} onMouseDown={() => selectAcVenue(v)}
-                          className="w-full text-left px-4 py-2.5 hover:bg-orange-50 border-b border-slate-100 last:border-0">
+                      {kakaoResults.map((p, i) => (
+                        <button
+                          key={i}
+                          onMouseDown={() => selectKakaoPlace(p)}
+                          className="w-full text-left px-4 py-2.5 hover:bg-orange-50 border-b border-slate-100 last:border-0"
+                        >
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-slate-800">{v.name}</span>
-                            <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-semibold">DB에 있음</span>
+                            <MapPin className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
+                            <span className="text-sm font-semibold text-slate-800 truncate">{p.place_name}</span>
+                            {p.distance && (
+                              <span className="text-xs text-orange-400 font-semibold flex-shrink-0">{p.distance}m</span>
+                            )}
+                            {p.category_name && (
+                              <span className="text-xs text-slate-400 flex-shrink-0 truncate max-w-[80px]">{p.category_name.split(' > ').pop()}</span>
+                            )}
                           </div>
-                          <p className="text-xs text-slate-400 mt-0.5">{v.location}{v.cost_per_person ? ` · ${v.cost_per_person}` : ''}</p>
+                          <p className="text-xs text-slate-400 mt-0.5 pl-5 truncate">{p.road_address_name || p.address_name}</p>
                         </button>
                       ))}
                     </div>
@@ -331,7 +328,7 @@ export default function DiningPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-xs font-semibold text-slate-500 mb-1 block">위치 *</Label>
-                    <Input placeholder="예: 강남역 2번 출구" value={sugLocation} onChange={(e) => setSugLocation(e.target.value)} />
+                    <Input placeholder="카카오 선택 시 자동입력" value={sugLocation} onChange={(e) => setSugLocation(e.target.value)} />
                   </div>
                   <div>
                     <Label className="text-xs font-semibold text-slate-500 mb-1 block">인당 비용</Label>
@@ -345,8 +342,8 @@ export default function DiningPage() {
                 </div>
 
                 <div>
-                  <Label className="text-xs font-semibold text-slate-500 mb-1 block">식당 링크 (선택)</Label>
-                  <Input placeholder="https://..." value={sugMapUrl} onChange={(e) => setSugMapUrl(e.target.value)} />
+                  <Label className="text-xs font-semibold text-slate-500 mb-1 block">식당 링크</Label>
+                  <Input placeholder="카카오 선택 시 자동입력" value={sugMapUrl} onChange={(e) => setSugMapUrl(e.target.value)} />
                 </div>
 
                 <Button className="w-full bg-orange-500 hover:bg-orange-600" onClick={handleSuggestSubmit} disabled={sugLoading}>

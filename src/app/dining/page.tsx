@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -9,7 +9,17 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { ArrowLeft, Plus, Trash2, UtensilsCrossed } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, UtensilsCrossed, MapPin } from 'lucide-react'
+
+interface KakaoPlace {
+  place_name: string
+  road_address_name: string
+  address_name: string
+  place_url: string
+  category_name: string
+  phone: string
+  distance: string
+}
 
 interface VenueInput {
   name: string
@@ -24,10 +34,141 @@ const emptyVenue = (): VenueInput => ({
   name: '', description: '', location: '', cost_per_person: '', has_private_room: false, map_url: '',
 })
 
+async function searchKakaoPlaces(query: string): Promise<KakaoPlace[]> {
+  if (!query.trim()) return []
+  const res = await fetch(`/api/kakao/search?q=${encodeURIComponent(query)}`)
+  if (!res.ok) return []
+  const data = await res.json()
+  return data.documents ?? []
+}
+
+function VenueForm({
+  venue,
+  index,
+  onChange,
+  onRemove,
+  showRemove,
+}: {
+  venue: VenueInput
+  index: number
+  onChange: (field: keyof VenueInput, value: string | boolean) => void
+  onRemove: () => void
+  showRemove: boolean
+}) {
+  const [suggestions, setSuggestions] = useState<KakaoPlace[]>([])
+  const [showSug, setShowSug] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const onNameChange = useCallback((val: string) => {
+    onChange('name', val)
+    if (timer.current) clearTimeout(timer.current)
+    if (!val.trim()) { setSuggestions([]); setShowSug(false); return }
+    timer.current = setTimeout(async () => {
+      const results = await searchKakaoPlaces(val)
+      setSuggestions(results)
+      setShowSug(results.length > 0)
+    }, 300)
+  }, [onChange])
+
+  const selectPlace = (p: KakaoPlace) => {
+    onChange('name', p.place_name)
+    onChange('location', p.road_address_name || p.address_name)
+    onChange('map_url', p.place_url)
+    setSuggestions([])
+    setShowSug(false)
+  }
+
+  return (
+    <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-slate-50/50">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-bold text-orange-500">장소 {index + 1}</span>
+        {showRemove && (
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onRemove}>
+            <Trash2 className="w-3.5 h-3.5 text-slate-400" />
+          </Button>
+        )}
+      </div>
+
+      {/* 장소명 + 카카오 자동완성 */}
+      <div className="relative">
+        <Input
+          placeholder="장소명 * (입력하면 카카오 검색)"
+          value={venue.name}
+          onChange={(e) => onNameChange(e.target.value)}
+          onBlur={() => setTimeout(() => setShowSug(false), 150)}
+          autoComplete="off"
+        />
+        {showSug && suggestions.length > 0 && (
+          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-20 overflow-hidden">
+            {suggestions.map((p, i) => (
+              <button
+                key={i}
+                onMouseDown={() => selectPlace(p)}
+                className="w-full text-left px-4 py-2.5 hover:bg-orange-50 border-b border-slate-100 last:border-0"
+              >
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
+                  <span className="text-sm font-semibold text-slate-800 truncate">{p.place_name}</span>
+                  {p.distance && (
+                    <span className="text-xs text-orange-400 font-semibold flex-shrink-0">{p.distance}m</span>
+                  )}
+                  {p.category_name && (
+                    <span className="text-xs text-slate-400 flex-shrink-0 truncate max-w-[80px]">
+                      {p.category_name.split(' > ').pop()}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5 pl-5 truncate">
+                  {p.road_address_name || p.address_name}
+                </p>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <Input
+        placeholder="메뉴/식당 한 줄 설명 (선택)"
+        value={venue.description}
+        onChange={(e) => onChange('description', e.target.value)}
+      />
+      <Input
+        placeholder="위치 * (카카오 선택 시 자동입력)"
+        value={venue.location}
+        onChange={(e) => onChange('location', e.target.value)}
+      />
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <Input
+            placeholder="인당 비용 (예: 3만원대)"
+            value={venue.cost_per_person}
+            onChange={(e) => onChange('cost_per_person', e.target.value)}
+          />
+          <p className="text-xs text-slate-400 mt-1">3만원대 / 2~4만원 / 미정</p>
+        </div>
+        <div className="flex items-center gap-2 pl-2">
+          <input
+            type="checkbox"
+            id={`room-${index}`}
+            checked={venue.has_private_room}
+            onChange={(e) => onChange('has_private_room', e.target.checked)}
+            className="w-4 h-4 accent-orange-500"
+          />
+          <Label htmlFor={`room-${index}`} className="text-sm cursor-pointer">룸 있음</Label>
+        </div>
+      </div>
+      <Input
+        placeholder="식당 링크 (카카오 선택 시 자동입력)"
+        value={venue.map_url}
+        onChange={(e) => onChange('map_url', e.target.value)}
+      />
+    </div>
+  )
+}
+
 export default function CreateDiningPage() {
   const router = useRouter()
   const [title, setTitle] = useState('')
-  const [desc, setDesc] = useState('')
   const [multiSelect, setMultiSelect] = useState(true)
   const [loading, setLoading] = useState(false)
   const [venues, setVenues] = useState<VenueInput[]>([emptyVenue(), emptyVenue()])
@@ -45,7 +186,13 @@ export default function CreateDiningPage() {
     try {
       const { data: room, error: roomErr } = await supabase
         .from('rooms')
-        .insert({ title, question: desc.trim() || '마음에 드는 장소에 투표해주세요!', multi_select: multiSelect, status: 'waiting', type: 'dining' })
+        .insert({
+          title,
+          question: '마음에 드는 장소에 투표해주세요!',
+          multi_select: multiSelect,
+          status: 'waiting',
+          type: 'dining',
+        })
         .select().single()
       if (roomErr) throw roomErr
 
@@ -84,7 +231,7 @@ export default function CreateDiningPage() {
             <UtensilsCrossed className="w-7 h-7 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-slate-900">회식 투표</h1>
-          <p className="text-slate-500 mt-2">장소 후보를 등록하고 팀원들이 투표해요</p>
+          <p className="text-slate-500 mt-2">장소명 입력 시 카카오에서 정보를 자동으로 채워요</p>
         </div>
 
         <Card className="shadow-lg border-0">
@@ -95,53 +242,56 @@ export default function CreateDiningPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="dining-title">투표 제목</Label>
-              <Input id="dining-title" placeholder="예: 2분기 팀 회식 장소 투표" value={title} onChange={(e) => setTitle(e.target.value)} />
+              <Input
+                id="dining-title"
+                placeholder="예: 2분기 팀 회식 장소 투표"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="dining-desc">안내 문구 (선택)</Label>
-              <Input id="dining-desc" placeholder="마음에 드는 곳에 모두 투표해주세요!" value={desc} onChange={(e) => setDesc(e.target.value)} />
-            </div>
+
             <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-              <input id="dining-multi" type="checkbox" checked={multiSelect} onChange={(e) => setMultiSelect(e.target.checked)} className="w-4 h-4 accent-orange-500" />
-              <Label htmlFor="dining-multi" className="cursor-pointer text-sm">복수 선택 허용 (여러 곳에 동시 투표 가능)</Label>
+              <input
+                id="dining-multi"
+                type="checkbox"
+                checked={multiSelect}
+                onChange={(e) => setMultiSelect(e.target.checked)}
+                className="w-4 h-4 accent-orange-500"
+              />
+              <Label htmlFor="dining-multi" className="cursor-pointer text-sm">
+                복수 선택 허용 (여러 곳에 동시 투표 가능)
+              </Label>
             </div>
 
             <div className="space-y-2">
               <Label className="text-sm font-semibold">장소 후보</Label>
               {venues.map((v, i) => (
-                <div key={i} className="border border-slate-200 rounded-xl p-4 space-y-3 bg-slate-50/50">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-orange-500">장소 {i + 1}</span>
-                    {venues.length > 2 && (
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setVenues((prev) => prev.filter((_, idx) => idx !== i))}>
-                        <Trash2 className="w-3.5 h-3.5 text-slate-400" />
-                      </Button>
-                    )}
-                  </div>
-                  <Input placeholder="장소명 *" value={v.name} onChange={(e) => updateVenue(i, 'name', e.target.value)} />
-                  <Input placeholder="메뉴/식당 한 줄 설명 (선택)" value={v.description} onChange={(e) => updateVenue(i, 'description', e.target.value)} />
-                  <Input placeholder="위치 * (예: 강남역 3번 출구 도보 5분)" value={v.location} onChange={(e) => updateVenue(i, 'location', e.target.value)} />
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Input placeholder="인당 비용 (예: 3만원대)" value={v.cost_per_person} onChange={(e) => updateVenue(i, 'cost_per_person', e.target.value)} />
-                      <p className="text-xs text-slate-400 mt-1">3만원대 / 2~4만원 / 미정</p>
-                    </div>
-                    <div className="flex items-center gap-2 pl-2">
-                      <input type="checkbox" id={`room-${i}`} checked={v.has_private_room} onChange={(e) => updateVenue(i, 'has_private_room', e.target.checked)} className="w-4 h-4 accent-orange-500" />
-                      <Label htmlFor={`room-${i}`} className="text-sm cursor-pointer">룸 있음</Label>
-                    </div>
-                  </div>
-                  <Input placeholder="식당 링크 (선택)" value={v.map_url} onChange={(e) => updateVenue(i, 'map_url', e.target.value)} />
-                </div>
+                <VenueForm
+                  key={i}
+                  venue={v}
+                  index={i}
+                  onChange={(field, value) => updateVenue(i, field, value)}
+                  onRemove={() => setVenues((prev) => prev.filter((_, idx) => idx !== i))}
+                  showRemove={venues.length > 2}
+                />
               ))}
               {venues.length < 10 && (
-                <Button variant="outline" size="sm" onClick={() => setVenues((prev) => [...prev, emptyVenue()])} className="w-full border-dashed border-orange-300 text-orange-500 hover:bg-orange-50">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setVenues((prev) => [...prev, emptyVenue()])}
+                  className="w-full border-dashed border-orange-300 text-orange-500 hover:bg-orange-50"
+                >
                   <Plus className="w-4 h-4 mr-1" /> 장소 추가
                 </Button>
               )}
             </div>
 
-            <Button className="w-full bg-orange-500 hover:bg-orange-600 h-12 text-base" onClick={handleCreate} disabled={loading}>
+            <Button
+              className="w-full bg-orange-500 hover:bg-orange-600 h-12 text-base"
+              onClick={handleCreate}
+              disabled={loading}
+            >
               {loading ? '생성 중...' : '투표방 만들기'}
             </Button>
           </CardContent>
