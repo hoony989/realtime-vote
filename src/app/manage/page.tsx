@@ -1,14 +1,16 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import type { Room, Schedule } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { Trash2, Copy, Vote, CalendarDays, Lock, RefreshCw, ChevronDown, ChevronUp, Users, UtensilsCrossed } from 'lucide-react'
+import { Trash2, Copy, Vote, CalendarDays, Lock, RefreshCw, ChevronDown, ChevronUp, Users, UtensilsCrossed, ExternalLink } from 'lucide-react'
 import { format } from 'date-fns'
 
 export default function ManagePage() {
+  const router = useRouter()
   const [authed, setAuthed] = useState<boolean | null>(null)
   const [password, setPassword] = useState('')
   const [loggingIn, setLoggingIn] = useState(false)
@@ -183,7 +185,10 @@ export default function ManagePage() {
             return (
               <div key={room.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="p-4 flex items-center justify-between gap-4">
-                  <div className="flex-1 min-w-0">
+                  <div
+                    className="flex-1 min-w-0 cursor-pointer group"
+                    onClick={() => router.push(room.type === 'vote' || room.type === 'dining' ? adminLinkFor(room) : linkFor(room))}
+                  >
                     <div className="flex items-center gap-2 mb-1">
                       <span
                         className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
@@ -197,8 +202,11 @@ export default function ManagePage() {
                         {format(new Date(room.created_at), 'yyyy-MM-dd HH:mm')}
                       </span>
                     </div>
-                    <p className="font-semibold text-slate-900 truncate">{room.title}</p>
-                    <div className="flex items-center gap-3 mt-1.5">
+                    <p className="font-semibold text-slate-900 truncate group-hover:text-blue-600 transition-colors">
+                      {room.title}
+                      <ExternalLink className="w-3.5 h-3.5 inline ml-1.5 opacity-0 group-hover:opacity-50 transition-opacity" />
+                    </p>
+                    <div className="flex items-center gap-3 mt-1.5" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => copy(linkFor(room))}
                         className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1"
