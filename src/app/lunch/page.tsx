@@ -34,6 +34,8 @@ function formatCategory(categoryName: string): string {
   return parts.slice(-2).join(' · ') || '음식점'
 }
 
+type Draw = { menu: string; restaurant: KakaoPlace }
+
 export default function LunchPicker() {
   const [menus, setMenus] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
@@ -46,6 +48,7 @@ export default function LunchPicker() {
   const [restaurantCandidates, setRestaurantCandidates] = useState<KakaoPlace[]>([])
   const [restaurantLoading, setRestaurantLoading] = useState(false)
   const [restaurantSearched, setRestaurantSearched] = useState(false)
+  const [drawHistory, setDrawHistory] = useState<Draw[]>([])
   const spinCount = useRef(0)
 
   useEffect(() => {
@@ -100,6 +103,9 @@ export default function LunchPicker() {
   const spin = () => {
     if (spinning || menus.length === 0) return
     setSpinning(true)
+    if (result && restaurant) {
+      setDrawHistory((prev) => [...prev, { menu: result, restaurant }])
+    }
     setResult(null)
     setRestaurant(null)
     setRestaurantCandidates([])
@@ -286,6 +292,40 @@ export default function LunchPicker() {
                 </button>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {drawHistory.length > 0 && (
+        <div className="w-full max-w-xs">
+          <p
+            className={`${mono.className} mb-2 text-[10px] tracking-widest text-black/35`}
+            style={{ filter: 'url(#wobble)' }}
+          >
+            지금까지 나온 후보 ({drawHistory.length})
+          </p>
+          <div className="flex flex-col gap-1.5">
+            {[...drawHistory].reverse().map((draw, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between gap-2 rounded-md border border-black/10 bg-white/40 px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <p className={`${mono.className} text-[9px] tracking-wide text-black/35`}>{draw.menu}</p>
+                  <p className={`${gowunDodum.className} truncate text-[13px] text-black/70`}>
+                    {draw.restaurant.place_name}
+                  </p>
+                </div>
+                <a
+                  href={draw.restaurant.place_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-shrink-0 text-black/30 hover:text-[#BF3A2C]"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </div>
+            ))}
           </div>
         </div>
       )}
