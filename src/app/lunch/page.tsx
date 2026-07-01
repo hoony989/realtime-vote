@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Gowun_Batang, Gowun_Dodum, JetBrains_Mono } from 'next/font/google'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, ExternalLink } from 'lucide-react'
 
 const gowunBatang = Gowun_Batang({ subsets: ['latin'], weight: '700' })
 const gowunDodum = Gowun_Dodum({ subsets: ['latin'], weight: '400' })
@@ -17,6 +17,23 @@ const WINDOW_WIDTH = 220
 const REPEAT = 14
 const SPIN_MS = 3200
 
+type KakaoPlace = {
+  place_name: string
+  category_name: string
+  road_address_name: string
+  address_name: string
+  place_url: string
+  distance: string
+}
+
+function formatCategory(categoryName: string): string {
+  const parts = categoryName
+    .split('>')
+    .map((s) => s.trim())
+    .filter((s) => s && s !== '음식점')
+  return parts.slice(-2).join(' · ') || '음식점'
+}
+
 export default function LunchPicker() {
   const [menus, setMenus] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
@@ -25,6 +42,10 @@ export default function LunchPicker() {
   const [spinning, setSpinning] = useState(false)
   const [translateX, setTranslateX] = useState(WINDOW_WIDTH / 2 - ITEM_WIDTH / 2)
   const [result, setResult] = useState<string | null>(null)
+  const [restaurant, setRestaurant] = useState<KakaoPlace | null>(null)
+  const [restaurantCandidates, setRestaurantCandidates] = useState<KakaoPlace[]>([])
+  const [restaurantLoading, setRestaurantLoading] = useState(false)
+  const [restaurantSearched, setRestaurantSearched] = useState(false)
   const spinCount = useRef(0)
 
   useEffect(() => {
@@ -46,10 +67,43 @@ export default function LunchPicker() {
 
   const strip = menus.length ? Array.from({ length: REPEAT }, () => menus).flat() : []
 
+  const fetchRestaurant = async (menuName: string) => {
+    setRestaurantLoading(true)
+    setRestaurant(null)
+    setRestaurantCandidates([])
+    setRestaurantSearched(false)
+    try {
+      const res = await fetch(`/api/kakao/search?q=${encodeURIComponent(menuName)}`)
+      const data = await res.json()
+      const docs: KakaoPlace[] = data.documents ?? []
+      setRestaurantCandidates(docs)
+      if (docs.length > 0) {
+        setRestaurant(docs[Math.floor(Math.random() * docs.length)])
+      }
+    } catch {
+      setRestaurantCandidates([])
+    } finally {
+      setRestaurantSearched(true)
+      setRestaurantLoading(false)
+    }
+  }
+
+  const rerollRestaurant = () => {
+    if (restaurantCandidates.length < 2) return
+    setRestaurant((prev) => {
+      const others = restaurantCandidates.filter((p) => p.place_name !== prev?.place_name)
+      const pool = others.length > 0 ? others : restaurantCandidates
+      return pool[Math.floor(Math.random() * pool.length)]
+    })
+  }
+
   const spin = () => {
     if (spinning || menus.length === 0) return
     setSpinning(true)
     setResult(null)
+    setRestaurant(null)
+    setRestaurantCandidates([])
+    setRestaurantSearched(false)
     spinCount.current += 1
 
     const targetIndex = Math.floor(Math.random() * menus.length)
@@ -60,7 +114,9 @@ export default function LunchPicker() {
 
     setTimeout(() => {
       setSpinning(false)
-      setResult(menus[targetIndex])
+      const picked = menus[targetIndex]
+      setResult(picked)
+      fetchRestaurant(picked)
     }, SPIN_MS)
   }
 
@@ -172,6 +228,67 @@ export default function LunchPicker() {
           ' '
         )}
       </p>
+
+      {restaurantLoading && (
+        <p className={`${mono.className} text-[11px] tracking-widest text-black/35`}>
+          주변 식당 찾는 중...
+        </p>
+      )}
+
+      {!restaurantLoading && restaurantSearched && !restaurant && (
+        <p className={`${gowunDodum.className} text-[12px] text-black/35`}>
+          근처에 마땅한 곳을 못 찾았어요
+        </p>
+      )}
+
+      {restaurant && (
+        <div className="relative w-full max-w-xs">
+          <div
+            className="absolute inset-0 rounded-lg border border-black/20"
+            style={{ filter: 'url(#wobble)' }}
+          />
+          <div className="relative flex flex-col gap-1.5 p-4">
+            <p
+              className={`${mono.className} text-[10px] tracking-widest text-black/40`}
+              style={{ filter: 'url(#wobble)' }}
+            >
+              {formatCategory(restaurant.category_name)} · {restaurant.distance}m
+            </p>
+            <p
+              className={`${gowunBatang.className} text-[17px] text-[#1F1B16]`}
+              style={{ filter: 'url(#wobble)' }}
+            >
+              {restaurant.place_name}
+            </p>
+            <p
+              className={`${gowunDodum.className} text-[12px] text-black/55`}
+              style={{ filter: 'url(#wobble)' }}
+            >
+              {restaurant.road_address_name || restaurant.address_name}
+            </p>
+            <div className="mt-1.5 flex items-center gap-3">
+              <a
+                href={restaurant.place_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`${mono.className} inline-flex items-center gap-1 text-[11px]`}
+                style={{ color: ACCENT, filter: 'url(#wobble)' }}
+              >
+                카카오맵에서 보기 <ExternalLink className="h-3 w-3" />
+              </a>
+              {restaurantCandidates.length > 1 && (
+                <button
+                  onClick={rerollRestaurant}
+                  className={`${mono.className} text-[11px] text-black/40 hover:text-black/60`}
+                  style={{ filter: 'url(#wobble)' }}
+                >
+                  다른 곳 보기
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mt-4 flex items-center gap-2">
         <input
