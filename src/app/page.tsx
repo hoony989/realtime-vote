@@ -79,6 +79,19 @@ function BowlIcon({ className }: { className?: string }) {
   )
 }
 
+function CoffeeCupIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 18" className={className} style={{ filter: 'url(#wobble)' }} aria-hidden>
+      <g fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 5.5h11v8.5a2.5 2.5 0 0 1-2.5 2.5H5.5A2.5 2.5 0 0 1 3 14V5.5z" />
+        <path d="M14 7h2.2a2 2 0 0 1 0 4H14" />
+        <path d="M6 2.5c0 1.2.8 2 2 2" />
+        <path d="M10 2.5c0 1.2.8 2 2 2" />
+      </g>
+    </svg>
+  )
+}
+
 function LadderIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 16 20" className={className} style={{ filter: 'url(#wobble)' }} aria-hidden>
@@ -293,6 +306,16 @@ export default function Home() {
               style={{ filter: 'url(#wobble)' }}
             >
               점메추
+            </span>
+          </Link>
+
+          <Link href="/coffee-order" className="group/hidden relative text-black/25 transition-colors duration-300 hover:text-[#BF3A2C]">
+            <CoffeeCupIcon className="h-5 w-5 transition-transform duration-300 group-hover/hidden:-rotate-6" />
+            <span
+              className={`${gowunDodum.className} pointer-events-none absolute left-1/2 top-full mt-1.5 -translate-x-1/2 whitespace-nowrap text-[11px] text-black/45 opacity-0 transition-opacity duration-300 group-hover/hidden:opacity-100`}
+              style={{ filter: 'url(#wobble)' }}
+            >
+              커피주문
             </span>
           </Link>
 
