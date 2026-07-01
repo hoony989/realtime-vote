@@ -343,12 +343,12 @@ export default function ManagePage() {
                 {lunchMenus.map((menu) => (
                   <span
                     key={menu.id}
-                    className="group inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 pl-3 pr-1.5 py-1 text-sm text-slate-700"
+                    className="group inline-flex items-center gap-0.5 rounded-full border border-slate-200 bg-slate-50 py-1 pl-3 pr-1 text-sm text-slate-700"
                   >
                     {menu.name}
                     <button
                       onClick={() => handleDeleteLunchMenu(menu)}
-                      className="rounded-full p-0.5 text-slate-400 hover:bg-red-100 hover:text-red-600"
+                      className="rounded-full p-2.5 text-slate-400 hover:bg-red-100 hover:text-red-600"
                       title="삭제"
                     >
                       <X className="w-3 h-3" />

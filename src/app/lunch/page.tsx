@@ -272,12 +272,12 @@ export default function LunchPicker() {
             >
               {restaurant.road_address_name || restaurant.address_name}
             </p>
-            <div className="mt-1.5 flex items-center gap-3">
+            <div className="-mb-3 flex items-center gap-4">
               <a
                 href={restaurant.place_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`${mono.className} inline-flex items-center gap-1 text-[11px]`}
+                className={`${mono.className} inline-flex items-center gap-1 py-3 text-[11px]`}
                 style={{ color: ACCENT, filter: 'url(#wobble)' }}
               >
                 카카오맵에서 보기 <ExternalLink className="h-3 w-3" />
@@ -285,7 +285,7 @@ export default function LunchPicker() {
               {restaurantCandidates.length > 1 && (
                 <button
                   onClick={rerollRestaurant}
-                  className={`${mono.className} text-[11px] text-black/40 hover:text-black/60`}
+                  className={`${mono.className} py-3 text-[11px] text-black/40 hover:text-black/60`}
                   style={{ filter: 'url(#wobble)' }}
                 >
                   다른 곳 보기
@@ -306,9 +306,12 @@ export default function LunchPicker() {
           </p>
           <div className="flex flex-col gap-1.5">
             {[...drawHistory].reverse().map((draw, i) => (
-              <div
+              <a
                 key={i}
-                className="flex items-center justify-between gap-2 rounded-md border border-black/10 bg-white/40 px-3 py-2"
+                href={draw.restaurant.place_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex items-center justify-between gap-2 rounded-md border border-black/10 bg-white/40 px-3 py-3 transition-colors hover:border-black/20 hover:bg-white/70"
               >
                 <div className="min-w-0">
                   <p className={`${mono.className} text-[9px] tracking-wide text-black/35`}>{draw.menu}</p>
@@ -316,15 +319,8 @@ export default function LunchPicker() {
                     {draw.restaurant.place_name}
                   </p>
                 </div>
-                <a
-                  href={draw.restaurant.place_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-shrink-0 text-black/30 hover:text-[#BF3A2C]"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </a>
-              </div>
+                <ExternalLink className="h-3.5 w-3.5 flex-shrink-0 text-black/30 transition-colors group-hover:text-[#BF3A2C]" />
+              </a>
             ))}
           </div>
         </div>
