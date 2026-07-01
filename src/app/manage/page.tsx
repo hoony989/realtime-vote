@@ -2,11 +2,11 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import type { Room, Schedule } from '@/lib/types'
+import type { Room, Schedule, LunchMenu } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { Trash2, Copy, Vote, CalendarDays, Lock, RefreshCw, ChevronDown, ChevronUp, Users, UtensilsCrossed, ExternalLink } from 'lucide-react'
+import { Trash2, Copy, Vote, CalendarDays, Lock, RefreshCw, ChevronDown, ChevronUp, Users, UtensilsCrossed, ExternalLink, X } from 'lucide-react'
 import { format } from 'date-fns'
 
 export default function ManagePage() {
@@ -19,6 +19,8 @@ export default function ManagePage() {
   const [expandedRoomId, setExpandedRoomId] = useState<string | null>(null)
   const [roomSchedules, setRoomSchedules] = useState<Record<string, Schedule[]>>({})
   const [loadingSchedules, setLoadingSchedules] = useState(false)
+  const [lunchMenus, setLunchMenus] = useState<LunchMenu[]>([])
+  const [loadingLunchMenus, setLoadingLunchMenus] = useState(false)
 
   const loadRooms = useCallback(async () => {
     setLoading(true)
@@ -39,6 +41,23 @@ export default function ManagePage() {
   useEffect(() => {
     loadRooms()
   }, [loadRooms])
+
+  const loadLunchMenus = useCallback(async () => {
+    setLoadingLunchMenus(true)
+    try {
+      const res = await fetch('/api/admin/lunch-menus')
+      if (res.ok) {
+        const data = await res.json()
+        setLunchMenus(data.menus ?? [])
+      }
+    } finally {
+      setLoadingLunchMenus(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (authed) loadLunchMenus()
+  }, [authed, loadLunchMenus])
 
   const handleLogin = async () => {
     if (!password.trim()) return
@@ -104,6 +123,18 @@ export default function ManagePage() {
       ...prev,
       [roomId]: (prev[roomId] ?? []).filter((s) => s.id !== schedule.id),
     }))
+    toast.success('삭제됐어요.')
+  }
+
+  const handleDeleteLunchMenu = async (menu: LunchMenu) => {
+    if (!confirm(`"${menu.name}" 메뉴를 삭제할까요?`)) return
+
+    const res = await fetch(`/api/admin/lunch-menus/${menu.id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      toast.error('삭제에 실패했어요.')
+      return
+    }
+    setLunchMenus((prev) => prev.filter((m) => m.id !== menu.id))
     toast.success('삭제됐어요.')
   }
 
@@ -295,6 +326,38 @@ export default function ManagePage() {
           {rooms.length === 0 && !loading && (
             <p className="text-center text-slate-400 py-12">아직 생성된 방이 없어요.</p>
           )}
+        </div>
+
+        <div className="mt-8">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-bold text-slate-900">점메추 메뉴 관리</h2>
+            <span className="text-sm text-slate-400">{lunchMenus.length}개</span>
+          </div>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 max-h-72 overflow-y-auto">
+            {loadingLunchMenus && lunchMenus.length === 0 ? (
+              <p className="text-sm text-slate-400 text-center py-4">불러오는 중...</p>
+            ) : lunchMenus.length === 0 ? (
+              <p className="text-sm text-slate-400 text-center py-4">등록된 메뉴가 없어요.</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {lunchMenus.map((menu) => (
+                  <span
+                    key={menu.id}
+                    className="group inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 pl-3 pr-1.5 py-1 text-sm text-slate-700"
+                  >
+                    {menu.name}
+                    <button
+                      onClick={() => handleDeleteLunchMenu(menu)}
+                      className="rounded-full p-0.5 text-slate-400 hover:bg-red-100 hover:text-red-600"
+                      title="삭제"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
