@@ -1,7 +1,5 @@
-import Anthropic from '@anthropic-ai/sdk'
 import { NextResponse } from 'next/server'
-
-const client = new Anthropic()
+import { generateClaudeText } from '@/lib/ai'
 
 export async function POST(req: Request) {
   try {
@@ -33,13 +31,11 @@ ${opinionLines}
 
 간결하고 명확하게 작성해주세요.`
 
-    const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
-      messages: [{ role: 'user', content: prompt }],
-    })
+    const summary = await generateClaudeText(prompt)
+    if (!summary) {
+      return NextResponse.json({ error: 'AI 요약 생성 실패' }, { status: 500 })
+    }
 
-    const summary = message.content[0].type === 'text' ? message.content[0].text : ''
     return NextResponse.json({ summary })
   } catch (error) {
     console.error('AI summary error:', error)
